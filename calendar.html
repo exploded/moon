@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="description" content="A page to find the rise and set times of the moon for any location. Uses goole maps to find your location.">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>About</title>
+	<link rel="stylesheet" href="https://storage.googleapis.com/code.getmdl.io/1.0.5/material.indigo-pink.min.css">
+	<script src="https://storage.googleapis.com/code.getmdl.io/1.0.5/material.min.js"></script>
+	<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+	<style>
+		.moon-layout-transparent {
+		  background: url('static/moon.jpg') center / cover;
+		}
+		.moon-layout-transparent .mdl-layout__header,
+		.moon-layout-transparent .mdl-layout__drawer-button {
+		  color: white;
+		}
+	</style>
+	<style>
+		.moon-card-wide.mdl-card {
+		width: 512px;
+		margin: 0 auto;
+		}
+		.moon-card-wide > .mdl-card__title {
+		color: #fff;
+		height: 176px;
+		}
+		
+		.customContainer{
+		max-width: 450px;
+		margin: 0 auto;
+		}			
+	</style>
+</head>
+<body>
+<div class="moon-layout-transparent mdl-layout mdl-js-layout">
+	<header class="mdl-layout__header mdl-layout__header--transparent">
+		<div class="mdl-layout__header-row">
+			<span class="mdl-layout-title">Moon Rise and Set</span>
+			<div class="mdl-layout-spacer"></div>
+			<nav class="mdl-navigation">
+				<a class="mdl-navigation__link" href="/">Home</a>
+			</nav>
+		</div>
+	</header>
+	<main class="mdl-layout__content">
+
+		
+<!--<div class="moon-card-wide mdl-card mdl-shadow--2dp">-->
+
+<table class="mdl-data-table mdl-js-data-table mdl-shadow--2dp customContainer">
+	<thead>
+		<tr>
+			<th>Date</th>
+			<th>Moon Rise</th>
+			<th>Moon Set</th>
+			<th>Sun Rise</th>
+			<th>Sun Set</th>
+		</tr>
+	</thead>
+	<tbody>
+	{{ range . }}
+		<tr>
+			<td>{{.Date}}</td>
+			<td>{{.Moon.Rise}}</td>
+			<td>{{.Moon.Set}}</td>
+			<td>{{.Sun.Rise}}</td>
+			<td>{{.Sun.Set}}</td>
+		</tr>
+	{{ end }}
+	</tbody>
+</table>
+
+
+<!--</div>-->
+	</main>
+	<footer class="mdl-mini-footer">
+	  <div class="mdl-mini-footer__left-section">
+	    <div class="mdl-logo">Moon Rise and Set</div>
+	    <ul class="mdl-mini-footer__link-list">
+	      <li><a href="#">James McHugh</a></li>
+	      <li><a href="about">About</a></li>
+	    </ul>
+	  </div>
+	</footer>
+</div>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
