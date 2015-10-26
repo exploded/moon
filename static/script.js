@@ -10,7 +10,7 @@ function setupMap() {
 	//
 	displayTimeZone();
 	getTimes();
-	updateCalLink()
+
 };
 
 function getLocationFromBrowser() {
@@ -30,6 +30,7 @@ function showgeolocation(position) {
 	$("#Latitude").get(0).MaterialTextfield.change(mylat);
 	$("#Longitude").get(0).MaterialTextfield.change(mylon);
 	moveMarker()
+	updateCalLink()
 };
 
 function moveMarker()
@@ -43,7 +44,7 @@ function moveMarker()
 
 function refresh() {
 	getLocationFromBrowser();
-	changeSpinners();
+	//changeSpinners();
 };
 
 function displayTimeZone() {
@@ -77,6 +78,7 @@ function addListener(marker)
 		$("#Latitude").get(0).MaterialTextfield.change(mylat);
 		$("#Longitude").get(0).MaterialTextfield.change(mylon);
 		getTimes()
+		updateCalLink()
 });
 }
 
@@ -106,7 +108,7 @@ function updateSpinners()
 	$("#lon").get(0).MaterialTextfield.change(mylon);	
 	var myLatLon = new google.maps.LatLng( mylat, mylon )
 	moveMarker()
-	 updateCalLink()
+	updateCalLink()
 }
 
 // Get the rise and set times from the server
