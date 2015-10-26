@@ -29,9 +29,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"time"
-
-  
+	"time"  
 )
 
 func main() {
@@ -67,9 +65,9 @@ func about(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 }
 
 func calendar(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	lon, _ := strconv.ParseFloat(r.URL.Query().Get("lon"), 64)
-	lat, _ := strconv.ParseFloat(r.URL.Query().Get("lat"), 64)
-	zon, _ := strconv.ParseFloat(r.URL.Query().Get("zon"), 64)
+	Lon, _ := strconv.ParseFloat(r.URL.Query().Get("lon"), 64)
+	Lat, _ := strconv.ParseFloat(r.URL.Query().Get("lat"), 64)
+	Zon, _ := strconv.ParseFloat(r.URL.Query().Get("zon"), 64)
 
 	type gridrow struct {
 		Date string
@@ -77,8 +75,23 @@ func calendar(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		Sun  riseset.RiseSet
 	}
 	var arow gridrow
-	var Rows []gridrow
+	//var Rows []gridrow
 	var newdate time.Time
+	
+	
+	type mypar struct {
+		Rows []gridrow
+		Lon float64
+		Lat float64
+		Zon float64
+	}
+	
+	var Passme mypar
+	
+	Passme.Lat=Lat
+	Passme.Lon=Lon
+	Passme.Zon=Zon
+	
 
 	for i := 0; i < 10; i++ {
 
@@ -87,13 +100,13 @@ func calendar(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
 		//arow=new(gridrow)
 		arow.Date = newdate.Format("02-01-2006")
-		arow.Moon = riseset.Riseset(1, newdate, lon, lat, zon)
-		arow.Sun = riseset.Riseset(2, newdate, lon, lat, zon)
+		arow.Moon = riseset.Riseset(1, newdate, Lon, Lat, Zon)
+		arow.Sun = riseset.Riseset(2, newdate, Lon, Lat, Zon)
 
-		Rows = append(Rows, arow)
+		Passme.Rows = append(Passme.Rows, arow)
 	}
 	t, _ := template.ParseFiles("calendar.html")
-	t.Execute(w, &Rows)
+	t.Execute(w, &Passme)
 }
 
 func siteroot(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {

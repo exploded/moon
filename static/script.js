@@ -2,6 +2,7 @@ var marker;
 var myMap;
 var mylat = -37;
 var mylon = 144;
+var myzon = 10
 
 function setupMap() {
 	getLocationFromBrowser();
@@ -9,6 +10,7 @@ function setupMap() {
 	//
 	displayTimeZone();
 	getTimes();
+	updateCalLink()
 };
 
 function getLocationFromBrowser() {
@@ -86,6 +88,15 @@ function SpinnersChanged()
 	var myLatLon = new google.maps.LatLng( mylat, mylon )
 	moveMarker()
 	getTimes();
+	 updateCalLink()
+}
+
+
+
+// Change the calendar link after a lat / on change
+function updateCalLink()
+{	
+    document.getElementById("callink").href="calendar?lat="+mylat+"&lon="+mylon+"&zon="+myzon;     
 }
 
 // Change the values in the spinners after a map change
@@ -95,11 +106,13 @@ function updateSpinners()
 	$("#lon").get(0).MaterialTextfield.change(mylon);	
 	var myLatLon = new google.maps.LatLng( mylat, mylon )
 	moveMarker()
+	 updateCalLink()
 }
 
 // Get the rise and set times from the server
 var getTimes = function(){	
 	var zon = $('#zon').val();	
+	myzon=zon;
 	$.getJSON("gettimes?lon=" + mylon + "&lat="+mylat+"&zon="+zon, function(json) {			
 			$("#Rise").get(0).MaterialTextfield.change(json.Rise);
 			$("#Set").get(0).MaterialTextfield.change(json.Set);	
