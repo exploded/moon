@@ -6,10 +6,9 @@ var myzon = 10
 
 function setupMap() {
 	getLocationFromBrowser();
-	showGoogleMaps();
 	//
-	displayTimeZone();
-	getTimes();
+	showGoogleMaps();
+
 
 };
 
@@ -31,6 +30,10 @@ function showgeolocation(position) {
 	$("#Longitude").get(0).MaterialTextfield.change(mylon);
 	moveMarker()
 	updateCalLink()
+	//
+	displayTimeZone();
+	getTimes();
+
 };
 
 function moveMarker()
