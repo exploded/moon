@@ -40,6 +40,8 @@ func main() {
 	router.GET("/calendar", calendar)
 	router.GET("/paths", paths)
 	
+    
+	
 	path,_:=os.Getwd()
 	fmt.Println("Path:"+path)
 	
