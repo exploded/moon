@@ -100,7 +100,6 @@ func calendar(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		newdate = time.Now().AddDate(0, 0, i)
 		//y, m, d := newdate.Date()
 
-		//arow=new(gridrow)
 		arow.Date = newdate.Format("02-01-2006")
 		arow.Moon = riseset.Riseset(1, newdate, Lon, Lat, Zon)
 		arow.Sun = riseset.Riseset(2, newdate, Lon, Lat, Zon)
