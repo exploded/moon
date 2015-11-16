@@ -25,7 +25,7 @@ import (
 	"io/ioutil"
 	"log"
 	"github.com/julienschmidt/httprouter"
-	"riseset"
+	"github.com/exploded/riseset"
 	"net/http"
 	"os"
 	"strconv"
@@ -94,12 +94,16 @@ func calendar(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	Passme.Lon=Lon
 	Passme.Zon=Zon
 	
+	var zondur  time.Duration
 
+	zondur = time.Hour*time.Duration(Zon)
+	newdate = time.Now().Add(zondur)
+	
 	for i := 0; i < 10; i++ {
-
-		newdate = time.Now().AddDate(0, 0, i)
-		//y, m, d := newdate.Date()
-
+		
+		
+		newdate = newdate.AddDate(0, 0, i)
+		
 		arow.Date = newdate.Format("02-01-2006")
 		arow.Moon = riseset.Riseset(1, newdate, Lon, Lat, Zon)
 		arow.Sun = riseset.Riseset(2, newdate, Lon, Lat, Zon)
@@ -128,7 +132,13 @@ func gettimes(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		lon, _ := strconv.ParseFloat(a, 64)
 		lat, _ := strconv.ParseFloat(b, 64)
 		zon, _ := strconv.ParseFloat(c, 64)
-		mydata = riseset.Riseset(1, time.Now(), lon, lat, zon)
+		
+		var zondur  time.Duration
+		var newdate time.Time
+		zondur = time.Hour*time.Duration(zon)
+		newdate = time.Now().Add(zondur)
+
+		mydata = riseset.Riseset(1, newdate, lon, lat, zon)
 	}
 	
 	json.NewEncoder(w).Encode(mydata)
@@ -160,8 +170,3 @@ func paths(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
         }
     }
 }
-	
-	
-	
-	
-
