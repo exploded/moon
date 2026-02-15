@@ -1,1 +1,26 @@
+# Environment files
+.env
+*.local.*
+
+# Go build artifacts
 /moon
+moon.exe
+
+# Backup files
+*.backup
+*.bak
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build directories
+moon-env/
+dist/

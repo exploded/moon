@@ -1,114 +1,95 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="description" content="A page to find the rise and set times of the moon for any location. Uses goole maps to find your location.">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Moon rise and set times</title>
-	<script src="//code.jquery.com/jquery-1.11.3.min.js"></script>
-	<link rel="stylesheet" href="https://storage.googleapis.com/code.getmdl.io/1.0.5/material.blue-indigo.min.css">
-	<script src="https://storage.googleapis.com/code.getmdl.io/1.0.5/material.min.js"></script>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="description" content="A page to find the rise and set times of the moon for any location. Uses Google Maps to find your location.">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Moon Rise and Set Times</title>
+	<script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
 	<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-	<style>
-		.moon-layout-transparent {
-		  background: url('static/moon.jpg') center / cover;
-		}
-		.moon-layout-transparent .mdl-layout__header,
-		.moon-layout-transparent .mdl-layout__drawer-button {
-		  color: white;
-		}
-	</style>
-	<script src="http://maps.google.com/maps/api/js?sensor=false"></script>
-	<script src="static/script.js"></script><script>
-  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
-
-  ga('create', 'UA-18121210-2', 'auto');
-  ga('send', 'pageview');
-
-</script>
+	<link rel="stylesheet" href="static/styles.css">
 </head>
-<body onload="setupMap()">
-<div class="moon-layout-transparent mdl-layout mdl-js-layout  mdl-layout--fixed-header">
-	<header class="mdl-layout__header mdl-layout__header--transparent ">
-		<div class="mdl-layout__header-row">
-			<span class="mdl-layout-title">Moon Rise and Set</span>
-			<div class="mdl-layout-spacer"></div>
-			<nav class="mdl-navigation">
-			<a class="mdl-navigation__link" id="callink" href="calendar">Calendar</a>
-			</nav>
-		</div>
-	</header>
-	<main class="mdl-layout__content">
-		<style>
-			.moon-card-wide.mdl-card {
-			  width: 512px;
-			 margin: 0 auto;
-			}
-			.moon-card-wide > .mdl-card__title {
-			  color: #fff;
-			  height: 176px;
-			}
-			
-			.customContainer{
-    		max-width: 450px;
-    		margin: 0 auto;
-			}			
-		</style>	
-		
-		<div class="moon-card-wide mdl-card mdl-shadow--2dp">
-			<div class="mdl-card__media">
-				<div id="mapholder"></div>
-			</div>
-			<div class="customContainer">
-				<div id="Latitude" class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label" >
-					<input id="lat" class="mdl-textfield__input" type="number" pattern="-?[0-9]*(\.[0-9]+)?"  min="-90" max="90" step="any" onchange="SpinnersChanged()" value="-37" />
-					<label class="mdl-textfield__label" for="Latitude">Latitude (decimal)</label>
-				</div>
-				<div  id="Longitude" class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-					<input id="lon" class="mdl-textfield__input" type="number" pattern="-?[0-9]*(\.[0-9]+)?"  min="-180" max="180" step="any" onchange="SpinnersChanged()" value="144" />
-					<label class="mdl-textfield__label" for="lon">Longitude (decimal)</label>
-				</div>				
-				<div id="Timezone" class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-					<input id="zon" class="mdl-textfield__input" type="number" pattern="-?[0-9]*(\.[0-9]+)?"  min="-12" max="12" step="0.5" onchange="getTimes()" value="" />
-					<label class="mdl-textfield__label" for="zon">Timezone</label>
-				</div>
-				
 
-				<div id="Rise" class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-					<input  readonly class="mdl-textfield__input" type="text"  />
-					<label class="mdl-textfield__label" for="Rise">Rise</label>
+<body>
+	<div class="container">
+		<header>
+			<div class="header-row">
+				<h1 class="header-title">🌙 Moon Rise and Set Times</h1>
+				<div class="spacer"></div>
+				<nav class="nav">
+					<a class="nav-link current" href="/"><i class="material-icons" style="font-size: 18px;">home</i> Home</a>
+					<a class="nav-link" href="about">About</a>
+					<a class="nav-link" href="calendar">Calendar</a>
+				</nav>
+			</div>
+		</header>
+		<main>
+			<div class="page-content">
+				<div class="card">
+					<div class="card-media">
+						<div id="mapholder" role="application" aria-label="Interactive map for selecting location"></div>
+					</div>
+					<div class="card-content">
+						<div class="form-section">
+							<h3>Location</h3>
+							<p class="form-instructions">Move the pin on the map to select your location</p>
+							<div class="input-row">
+								<div class="input-group">
+									<label class="input-label" for="lat">Latitude</label>
+								<input id="lat" type="number" pattern="-?[0-9]*(\.[0-9]+)?" min="-90" max="90" step="any" onchange="SpinnersChanged()" value="-37" aria-label="Latitude in decimal degrees" />
+							</div>
+							<div class="input-group">
+								<label class="input-label" for="lon">Longitude</label>
+								<input id="lon" type="number" pattern="-?[0-9]*(\.[0-9]+)?" min="-180" max="180" step="any" onchange="SpinnersChanged()" value="144" aria-label="Longitude in decimal degrees" />
+							</div>
+						</div>
+						<div class="input-group">
+					<label class="input-label" for="timezone">Timezone</label>
+					<select id="timezone" onchange="timezoneChanged()" aria-label="Select timezone">
+						<option value="">Loading timezones...</option>
+					</select>
+					<input id="zon" type="hidden" value="" />
+				<div class="results-section">
+					<h3>Moon Times for Today</h3>
+					<div class="result-item">
+						<span class="result-label">🌄 Moonrise</span>
+						<input id="Rise" readonly class="result-value" type="text" aria-label="Moon rise time" value="--:--" />
+					</div>
+					<div class="result-item">
+						<span class="result-label">🌅 Moonset</span>
+						<input id="Set" readonly class="result-value" type="text" aria-label="Moon set time" value="--:--" />
+					</div>
 				</div>
-				
-				<div id="Set" class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-					<input readonly class="mdl-textfield__input" type="text"  />
-					<label class="mdl-textfield__label" for="Set">Set</label>
+
+				<p id="errormessage" role="alert" aria-live="polite"></p>
+			</div>
+					<div class="card-actions">
+						<button class="btn" onclick="refresh()" aria-label="Reset location to browser location">
+							<i class="material-icons" style="font-size: 18px;">my_location</i> Use My Location
+						</button>
+					</div>
 				</div>
-								
-				
-<!--				<p class="mdl-card__title-text">Rise:&nbsp;<b><span id="Rise"></span></b>&nbsp;&nbsp;Set:&nbsp;<b><span id="Set"></span></b></p>-->
-				
-				<p class="mdl-card__title-text" id="errormessage"></p>				
-			</div>			
-			<div class="mdl-card__actions mdl-card--border">
-    			<a class="mdl-button mdl-button--colored mdl-js-button mdl-js-ripple-effect" onclick="refresh()">
-      			Reset
-    			</a>
-  			</div>
-		</div>
-	</main>
-	<footer class="mdl-mini-footer">
-	  <div class="mdl-mini-footer__left-section">
-	    <div class="mdl-logo">Moon Rise and Set</div>
-	    <ul class="mdl-mini-footer__link-list">
-	      <li><a href="#">James McHugh</a></li>
-	      <li><a href="about">About</a></li>
-	    </ul>
-	  </div>
-	</footer>
-</div>
+			</div>
+		</main>
+	</div>
+	<script src="static/script.js"></script>
+	<script>
+		// Load Google Maps API key from server
+		fetch('/api/maps-key')
+			.then(response => response.json())
+			.then(data => {
+				const script = document.createElement('script');
+				script.src = 'https://maps.googleapis.com/maps/api/js?key=' + data.key + '&loading=async&callback=initMap&libraries=marker';
+				script.async = true;
+				script.defer = true;
+				document.head.appendChild(script);
+			})
+			.catch(error => {
+				document.getElementById('errormessage').textContent = 'Failed to load map. Please refresh the page.';
+			});
+	</script>
 </body>
+
 </html>

@@ -1,0 +1,22 @@
+[Unit]
+Description=Moon Rise and Set Web Application
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/moon
+EnvironmentFile=/usr/local/bin/moon-env
+ExecStart=/usr/local/bin/moon
+Restart=always
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
