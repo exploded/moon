@@ -343,7 +343,6 @@ moon/
 ├── .env.example         # Environment variables template
 ├── .gitignore           # Git ignore rules
 ├── moon.service         # systemd service file
-├── Procfile             # Heroku deployment
 └── README.md            # This file
 ```
 
