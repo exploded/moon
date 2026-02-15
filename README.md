@@ -58,7 +58,14 @@ A web application that calculates and displays moon rise and set times for any l
    - Create a new project or select existing one
    - Enable "Maps JavaScript API"
    - Create credentials (API Key)
-   - Restrict the API key to your domain (recommended for production)
+   - **IMPORTANT**: Restrict the API key (recommended for production):
+     - **Application restrictions**: Set HTTP referrers
+       - Add your domain: `https://yourdomain.com/*`
+       - For local development: `http://localhost:8181/*`
+     - **API restrictions**: Restrict key to "Maps JavaScript API" only
+     - Set usage quotas to prevent abuse
+   
+   > **Security Note**: Google Maps JavaScript API keys are client-side visible by design. The security comes from properly configuring API key restrictions in Google Cloud Console, not from hiding the key.
 
 ## Running the Application
 
@@ -352,7 +359,6 @@ moon/
 - `GET /about` - About page
 - `GET /calendar` - Calendar view (query params: lat, lon, zon)
 - `GET /gettimes` - JSON API for moon times (query params: lat, lon, zon)
-- `GET /api/maps-key` - Returns Maps API key for client
 - `GET /static/*` - Static assets (cached for 7 days)
 
 ## Configuration
@@ -379,6 +385,8 @@ moon/
 - Content-Security-Policy with strict resource restrictions
 - Input validation for latitude, longitude, and timezone
 - Graceful shutdown on SIGTERM/SIGINT
+- API key passed via server-side template rendering (not exposed via endpoint)
+- Encourages Google Maps API key restrictions (HTTP referrers, API restrictions, quotas)
 
 ## Browser Support
 

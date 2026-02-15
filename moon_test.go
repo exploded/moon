@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/exploded/riseset"
@@ -59,68 +58,6 @@ func TestGettimesMissingParams(t *testing.T) {
 
 	if result.Rise != "error" || result.Set != "error" {
 		t.Errorf("handler should return error for missing parameters")
-	}
-}
-
-// Test the maps key handler
-func TestMapsKey(t *testing.T) {
-	// Set a test API key for this test
-	originalKey := os.Getenv("GOOGLE_MAPS_API_KEY")
-	testKey := "test_api_key_for_testing"
-	os.Setenv("GOOGLE_MAPS_API_KEY", testKey)
-	defer func() {
-		if originalKey != "" {
-			os.Setenv("GOOGLE_MAPS_API_KEY", originalKey)
-		} else {
-			os.Unsetenv("GOOGLE_MAPS_API_KEY")
-		}
-	}()
-
-	req, err := http.NewRequest("GET", "/api/maps-key", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(mapsKey)
-	handler.ServeHTTP(rr, req)
-
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
-	}
-
-	var result map[string]string
-	err = json.Unmarshal(rr.Body.Bytes(), &result)
-	if err != nil {
-		t.Errorf("handler returned invalid JSON: %v", err)
-	}
-
-	if key, exists := result["key"]; !exists || key != testKey {
-		t.Errorf("handler should return the test API key, got %v", key)
-	}
-}
-
-// Test the maps key handler with environment variable
-func TestMapsKeyWithEnv(t *testing.T) {
-	originalKey := os.Getenv("GOOGLE_MAPS_API_KEY")
-	testKey := "test_api_key_12345"
-	os.Setenv("GOOGLE_MAPS_API_KEY", testKey)
-	defer os.Setenv("GOOGLE_MAPS_API_KEY", originalKey)
-
-	req, err := http.NewRequest("GET", "/api/maps-key", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(mapsKey)
-	handler.ServeHTTP(rr, req)
-
-	var result map[string]string
-	json.Unmarshal(rr.Body.Bytes(), &result)
-
-	if result["key"] != testKey {
-		t.Errorf("handler should use environment variable: got %v want %v", result["key"], testKey)
 	}
 }
 
@@ -223,7 +160,6 @@ func TestContentTypeHeaders(t *testing.T) {
 		handler  http.HandlerFunc
 	}{
 		{"/gettimes?lon=144&lat=-37&zon=10", gettimes},
-		{"/api/maps-key", mapsKey},
 	}
 
 	for _, tt := range tests {

@@ -102,7 +102,6 @@ func makeHTTPServer() *http.Server {
 	mux.HandleFunc("/about", about)
 	mux.HandleFunc("/gettimes", gettimes)
 	mux.HandleFunc("/calendar", calendar)
-	mux.HandleFunc("/api/maps-key", mapsKey)
 	mux.HandleFunc("/favicon.ico", handleFavicon)
 	path, _ := os.Getwd()
 	log.Printf("Working directory: %s", path)
@@ -241,13 +240,32 @@ func calendar(w http.ResponseWriter, r *http.Request) {
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	body, err := os.ReadFile("index.html")
-	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		log.Printf("Error reading index.html: %v", err)
-		return
+	
+	type IndexData struct {
+		GoogleMapsKey string
 	}
-	fmt.Fprint(w, string(body))
+	
+	data := IndexData{
+		GoogleMapsKey: getGoogleMapsKey(),
+	}
+	
+	if templates != nil {
+		if err := templates.ExecuteTemplate(w, "index.html", data); err != nil {
+			log.Printf("Error executing index template: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+	} else {
+		// Fallback to parsing on demand
+		t, err := template.ParseFiles("index.html")
+		if err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			log.Printf("Error parsing index template: %v", err)
+			return
+		}
+		if err := t.Execute(w, data); err != nil {
+			log.Printf("Error executing index template: %v", err)
+		}
+	}
 }
 
 func gettimes(w http.ResponseWriter, r *http.Request) {
@@ -286,11 +304,7 @@ func gettimes(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(mydata)
 }
 
-func mapsKey(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	response := map[string]string{"key": getGoogleMapsKey()}
-	json.NewEncoder(w).Encode(response)
-}
+
 
 func handleFavicon(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "favicon.ico")

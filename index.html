@@ -74,22 +74,12 @@
 			</div>
 		</main>
 	</div>
-	<script src="static/script.js"></script>
 	<script>
-		// Load Google Maps API key from server
-		fetch('/api/maps-key')
-			.then(response => response.json())
-			.then(data => {
-				const script = document.createElement('script');
-				script.src = 'https://maps.googleapis.com/maps/api/js?key=' + data.key + '&loading=async&callback=initMap&libraries=marker';
-				script.async = true;
-				script.defer = true;
-				document.head.appendChild(script);
-			})
-			.catch(error => {
-				document.getElementById('errormessage').textContent = 'Failed to load map. Please refresh the page.';
-			});
+		// Google Maps API key passed from server
+		window.GOOGLE_MAPS_KEY = '{{.GoogleMapsKey}}';
 	</script>
+	<script src="static/script.js"></script>
+	<script src="https://maps.googleapis.com/maps/api/js?key={{.GoogleMapsKey}}&loading=async&callback=initMap&libraries=marker" async defer></script>
 </body>
 
 </html>
