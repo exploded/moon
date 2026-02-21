@@ -42,10 +42,10 @@
 							{{ range .Rows }}
 							<tr>
 								<td>{{.Date}}</td>
-								<td>{{.Moon.Rise}}</td>
-								<td>{{.Moon.Set}}</td>
-								<td>{{.Sun.Rise}}</td>
-								<td>{{.Sun.Set}}</td>
+								<td>{{if .Moon.AlwaysAbove}}Always above{{else if .Moon.AlwaysBelow}}Always below{{else}}{{.Moon.Rise}}{{end}}</td>
+								<td>{{if .Moon.AlwaysAbove}}Always above{{else if .Moon.AlwaysBelow}}Always below{{else}}{{.Moon.Set}}{{end}}</td>
+								<td>{{if .Sun.AlwaysAbove}}Always above{{else if .Sun.AlwaysBelow}}Always below{{else}}{{.Sun.Rise}}{{end}}</td>
+								<td>{{if .Sun.AlwaysAbove}}Always above{{else if .Sun.AlwaysBelow}}Always below{{else}}{{.Sun.Set}}{{end}}</td>
 							</tr>
 							{{ end }}
 						</tbody>

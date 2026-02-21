@@ -293,12 +293,20 @@ const getTimes = function () {
 	
 	$.getJSON(`gettimes?lon=${mylon}&lat=${mylat}&zon=${zon}`)
 		.done((json) => {
-			if (json.Rise && json.Set) {
+			if (json.Rise === "error" || json.Set === "error") {
+				showErrorMessage('Unable to calculate moon times for this location.');
+			} else if (json.AlwaysAbove) {
+				updateInputField("Rise", "Always above horizon");
+				updateInputField("Set", "Always above horizon");
+				clearErrorMessage();
+			} else if (json.AlwaysBelow) {
+				updateInputField("Rise", "Always below horizon");
+				updateInputField("Set", "Always below horizon");
+				clearErrorMessage();
+			} else if (json.Rise && json.Set) {
 				updateInputField("Rise", json.Rise);
 				updateInputField("Set", json.Set);
 				clearErrorMessage();
-			} else if (json.Rise === "error" || json.Set === "error") {
-				showErrorMessage('Unable to calculate moon times for this location.');
 			}
 		})
 		.fail((jqXHR, textStatus, errorThrown) => {

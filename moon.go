@@ -214,8 +214,8 @@ func calendar(w http.ResponseWriter, r *http.Request) {
 	for i := 0; i < 10; i++ {
 		newdate = newdate.AddDate(0, 0, 1)
 		arow.Date = newdate.Format("02-01-2006")
-		arow.Moon = riseset.Riseset(1, newdate, Lon, Lat, Zon)
-		arow.Sun = riseset.Riseset(2, newdate, Lon, Lat, Zon)
+		arow.Moon = riseset.Riseset(riseset.Moon, newdate, Lon, Lat, Zon)
+		arow.Sun = riseset.Riseset(riseset.Sun, newdate, Lon, Lat, Zon)
 		Passme.Rows = append(Passme.Rows, arow)
 	}
 
@@ -299,7 +299,7 @@ func gettimes(w http.ResponseWriter, r *http.Request) {
 		var newdate time.Time
 		zondur = time.Hour * time.Duration(zon)
 		newdate = time.Now().Add(zondur)
-		mydata = riseset.Riseset(1, newdate, lon, lat, zon)
+		mydata = riseset.Riseset(riseset.Moon, newdate, lon, lat, zon)
 	}
 	json.NewEncoder(w).Encode(mydata)
 }
