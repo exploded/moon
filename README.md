@@ -61,7 +61,7 @@ A web application that calculates and displays moon rise and set times for any l
    - **IMPORTANT**: Restrict the API key (recommended for production):
      - **Application restrictions**: Set HTTP referrers
        - Add your domain: `https://yourdomain.com/*`
-       - For local development: `http://localhost:8181/*`
+       - For local development: `http://localhost:8484/*`
      - **API restrictions**: Restrict key to "Maps JavaScript API" only
      - Set usage quotas to prevent abuse
    
@@ -76,7 +76,7 @@ A web application that calculates and displays moon rise and set times for any l
 go run moon.go
 ```
 
-The server will start on `http://localhost:8181`
+The server will start on `http://localhost:8484`
 
 ### Windows Development
 
@@ -277,7 +277,7 @@ server {
     server_name your-domain.com;
 
     location / {
-        proxy_pass http://localhost:8181;
+        proxy_pass http://localhost:8484;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -427,7 +427,7 @@ moon/
 
 ### Server Settings
 
-- **Port**: 8181 (default)
+- **Port**: 8484 (default)
 - **Read Timeout**: 5 seconds
 - **Write Timeout**: 5 seconds
 - **Idle Timeout**: 120 seconds

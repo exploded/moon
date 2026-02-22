@@ -114,7 +114,7 @@ func makeHTTPServer() *http.Server {
 
 func main() {
 	var flgProduction bool
-	var httpPort string = ":8181"
+	var httpPort string = ":8484"
 	if os.Getenv("PROD") == "True" {
 		flgProduction = true
 	} else {
@@ -240,15 +240,15 @@ func calendar(w http.ResponseWriter, r *http.Request) {
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	
+
 	type IndexData struct {
 		GoogleMapsKey string
 	}
-	
+
 	data := IndexData{
 		GoogleMapsKey: getGoogleMapsKey(),
 	}
-	
+
 	if templates != nil {
 		if err := templates.ExecuteTemplate(w, "index.html", data); err != nil {
 			log.Printf("Error executing index template: %v", err)
@@ -303,8 +303,6 @@ func gettimes(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(mydata)
 }
-
-
 
 func handleFavicon(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "favicon.ico")
