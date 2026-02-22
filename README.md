@@ -321,6 +321,58 @@ sudo ufw enable
 sudo ufw status
 ```
 
+## CI/CD Deployment (GitHub Actions → Linode)
+
+Every push to `master` automatically runs tests, builds a Linux binary, and deploys it to your Linode server via SSH.
+
+### How it works
+
+1. GitHub Actions runs tests (`go test`)
+2. If tests pass, it cross-compiles a Linux amd64 binary
+3. It SCPs the binary and web assets to your server
+4. It SSHs in and installs them, then restarts the systemd service
+
+### One-time server setup
+
+Run the provided setup script **once** on your Linode server:
+
+```bash
+sudo bash scripts/server-setup.sh
+```
+
+This script:
+- Creates a `deploy` user with a generated SSH key pair
+- Adds a minimal `sudoers` entry so `deploy` can copy files and restart the service
+- Prints the private key and the exact secrets to add to GitHub
+
+### GitHub repository secrets
+
+After running the setup script, go to your GitHub repo:
+**Settings → Secrets and variables → Actions → New repository secret**
+
+| Secret name      | Value                                      |
+|------------------|--------------------------------------------|
+| `DEPLOY_HOST`    | Your Linode public IP or hostname          |
+| `DEPLOY_USER`    | `deploy`                                   |
+| `DEPLOY_SSH_KEY` | The private key printed by the setup script |
+| `DEPLOY_PORT`    | Your SSH port (only if not port 22)        |
+
+### Triggering a deployment
+
+Push to `master`:
+
+```bash
+git push origin master
+```
+
+GitHub Actions will:
+1. Run the `Test` job
+2. If tests pass, run the `Deploy to Production` job
+3. Report success or failure in the Actions tab
+
+View deployment logs at:
+`https://github.com/<your-org>/moon/actions`
+
 ## Testing
 
 Run the test suite:
@@ -337,20 +389,25 @@ go test -cover
 
 ```
 moon/
-├── moon.go              # Main server application
-├── moon_test.go         # Unit tests
-├── index.html           # Home page
-├── about.html           # About page
-├── calendar.html        # Calendar view
+├── moon.go                          # Main server application
+├── moon_test.go                     # Unit tests
+├── index.html                       # Home page
+├── about.html                       # About page
+├── calendar.html                    # Calendar view
 ├── static/
-│   ├── styles.css       # Global styles
-│   ├── script.js        # Client-side JavaScript
-│   └── moon.jpg         # Background image
-├── go.mod               # Go module dependencies
-├── .env.example         # Environment variables template
-├── .gitignore           # Git ignore rules
-├── moon.service         # systemd service file
-└── README.md            # This file
+│   ├── styles.css                   # Global styles
+│   ├── script.js                    # Client-side JavaScript
+│   └── moon.jpg                     # Background image
+├── .github/
+│   └── workflows/
+│       └── deploy.yml               # GitHub Actions CI/CD pipeline
+├── scripts/
+│   └── server-setup.sh              # One-time Linode server setup
+├── go.mod                           # Go module dependencies
+├── .env.example                     # Environment variables template
+├── .gitignore                       # Git ignore rules
+├── moon.service                     # systemd service file
+└── README.md                        # This file
 ```
 
 ## API Endpoints
