@@ -53,35 +53,74 @@ chmod 600 "$KEY_DIR/authorized_keys"
 chown -R "$DEPLOY_USER:$DEPLOY_USER" "$KEY_DIR"
 
 # ---------------------------------------------------------------
-# 3. Create sudoers entry (least privilege)
+# 3. Create the server-side deploy script (runs as root via sudo)
+#
+#    Reads User/Group directly from the installed service file so
+#    this script never needs to hardcode a username.
+# ---------------------------------------------------------------
+cat > /usr/local/bin/deploy-moon << 'DEPLOY_SCRIPT'
+#!/bin/bash
+# /usr/local/bin/deploy-moon
+# Runs as root (via sudo) during GitHub Actions deployments.
+
+set -e
+
+DEPLOY_SRC="${1:-/tmp/moon-deploy}"
+DEPLOY_DIR=/var/www/moon
+
+# Read the service owner from the installed unit — no hardcoded username
+SERVICE_USER=$(systemctl show moon --property=User --value)
+SERVICE_GROUP=$(systemctl show moon --property=Group --value)
+
+if [ -z "$SERVICE_USER" ]; then
+    echo "[deploy] ERROR: Could not read User from moon.service"
+    exit 1
+fi
+
+echo "[deploy] Installing binary to $DEPLOY_DIR/moon (owner: $SERVICE_USER:$SERVICE_GROUP)..."
+cp "$DEPLOY_SRC/moon" "$DEPLOY_DIR/moon"
+chmod +x "$DEPLOY_DIR/moon"
+
+echo "[deploy] Updating web assets..."
+cp "$DEPLOY_SRC/index.html"    "$DEPLOY_DIR/"
+cp "$DEPLOY_SRC/about.html"    "$DEPLOY_DIR/"
+cp "$DEPLOY_SRC/calendar.html" "$DEPLOY_DIR/"
+cp -r "$DEPLOY_SRC/static/"    "$DEPLOY_DIR/"
+chown -R "$SERVICE_USER:$SERVICE_GROUP" "$DEPLOY_DIR"
+
+echo "[deploy] Restarting service..."
+systemctl restart moon
+
+echo "[deploy] Verifying service is active..."
+sleep 2
+if ! systemctl is-active --quiet moon; then
+    echo "[deploy] ERROR: Service failed to start. Status:"
+    systemctl status moon --no-pager --lines=30
+    exit 1
+fi
+
+echo "[deploy] Cleaning up..."
+rm -rf "$DEPLOY_SRC"
+
+echo "[deploy] Done — moon is running."
+DEPLOY_SCRIPT
+
+chmod +x /usr/local/bin/deploy-moon
+echo "[ok] Created /usr/local/bin/deploy-moon"
+
+# ---------------------------------------------------------------
+# 4. Configure sudoers — only allow the one deploy script
 # ---------------------------------------------------------------
 SUDOERS_FILE="/etc/sudoers.d/moon-deploy"
 
 cat > "$SUDOERS_FILE" << 'EOF'
-# Allow the deploy user to install the moon app without a password
-deploy ALL=(ALL) NOPASSWD: \
-    /bin/cp /tmp/moon-deploy/moon /usr/local/bin/moon, \
-    /bin/chmod +x /usr/local/bin/moon, \
-    /bin/cp /tmp/moon-deploy/index.html /var/www/moon/, \
-    /bin/cp /tmp/moon-deploy/about.html /var/www/moon/, \
-    /bin/cp /tmp/moon-deploy/calendar.html /var/www/moon/, \
-    /bin/cp -r /tmp/moon-deploy/static/ /var/www/moon/, \
-    /bin/chown -R www-data\:www-data /var/www/moon, \
-    /usr/bin/systemctl restart moon, \
-    /usr/bin/systemctl is-active moon
+# Allow the deploy user to run the moon deployment script as root
+deploy ALL=(ALL) NOPASSWD: /usr/local/bin/deploy-moon
 EOF
 
 chmod 440 "$SUDOERS_FILE"
-# Validate the file
 visudo -c -f "$SUDOERS_FILE"
 echo "[ok] sudoers entry created at $SUDOERS_FILE"
-
-# ---------------------------------------------------------------
-# 4. Ensure /var/www/moon exists and is owned correctly
-# ---------------------------------------------------------------
-mkdir -p /var/www/moon
-chown -R www-data:www-data /var/www/moon
-echo "[ok] /var/www/moon ready"
 
 # ---------------------------------------------------------------
 # 5. Print next steps

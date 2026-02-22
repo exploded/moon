@@ -17,7 +17,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
-          cache: true
+          cache: false
 
       - name: Download dependencies
         run: go mod download
@@ -38,7 +38,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
-          cache: true
+          cache: false
 
       - name: Download dependencies
         run: go mod download
@@ -52,7 +52,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          port: ${{ secrets.DEPLOY_PORT || '22' }}
           source: "moon,index.html,about.html,calendar.html,static/"
           target: "/tmp/moon-deploy"
           overwrite: true
@@ -63,31 +63,5 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: ${{ secrets.DEPLOY_PORT || 22 }}
-          script: |
-            set -e
-
-            DEPLOY_SRC=/tmp/moon-deploy
-
-            # Install binary
-            sudo cp "$DEPLOY_SRC/moon" /usr/local/bin/moon
-            sudo chmod +x /usr/local/bin/moon
-
-            # Update web assets
-            sudo cp "$DEPLOY_SRC/index.html" /var/www/moon/
-            sudo cp "$DEPLOY_SRC/about.html" /var/www/moon/
-            sudo cp "$DEPLOY_SRC/calendar.html" /var/www/moon/
-            sudo cp -r "$DEPLOY_SRC/static/" /var/www/moon/
-            sudo chown -R www-data:www-data /var/www/moon
-
-            # Restart service
-            sudo systemctl restart moon
-
-            # Verify it came back up
-            sleep 2
-            sudo systemctl is-active moon
-
-            # Clean up
-            rm -rf "$DEPLOY_SRC"
-
-            echo "Deployment complete"
+          port: ${{ secrets.DEPLOY_PORT || '22' }}
+          script: sudo /usr/local/bin/deploy-moon /tmp/moon-deploy
