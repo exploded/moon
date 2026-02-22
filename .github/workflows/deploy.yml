@@ -44,7 +44,7 @@ jobs:
         run: go mod download
 
       - name: Build Linux binary
-        run: GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o moon .
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o moon .
 
       - name: Copy files to server
         uses: appleboy/scp-action@v0.1.7
