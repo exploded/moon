@@ -53,7 +53,10 @@ chmod 600 "$KEY_DIR/authorized_keys"
 chown -R "$DEPLOY_USER:$DEPLOY_USER" "$KEY_DIR"
 
 # ---------------------------------------------------------------
-# 3. Create the server-side deploy script (run as root via sudo)
+# 3. Create the server-side deploy script (runs as root via sudo)
+#
+#    Reads User/Group directly from the installed service file so
+#    this script never needs to hardcode a username.
 # ---------------------------------------------------------------
 cat > /usr/local/bin/deploy-moon << 'DEPLOY_SCRIPT'
 #!/bin/bash
@@ -63,35 +66,27 @@ cat > /usr/local/bin/deploy-moon << 'DEPLOY_SCRIPT'
 set -e
 
 DEPLOY_SRC="${1:-/tmp/moon-deploy}"
+DEPLOY_DIR=/var/www/moon
 
-echo "[deploy] Installing binary..."
-cp "$DEPLOY_SRC/moon" /usr/local/bin/moon
-chmod +x /usr/local/bin/moon
+# Read the service owner from the installed unit — no hardcoded username
+SERVICE_USER=$(systemctl show moon --property=User --value)
+SERVICE_GROUP=$(systemctl show moon --property=Group --value)
 
-echo "[deploy] Installing service file..."
-cp "$DEPLOY_SRC/moon.service" /etc/systemd/system/moon.service
-
-echo "[deploy] Updating web assets..."
-mkdir -p /var/www/moon
-cp "$DEPLOY_SRC/index.html"    /var/www/moon/
-cp "$DEPLOY_SRC/about.html"    /var/www/moon/
-cp "$DEPLOY_SRC/calendar.html" /var/www/moon/
-cp -r "$DEPLOY_SRC/static/"    /var/www/moon/
-chown -R www-data:www-data /var/www/moon
-
-# Create environment file if missing — edit it to add your API key
-if [ ! -f /usr/local/bin/moon-env ]; then
-    echo "[deploy] Creating empty environment file at /usr/local/bin/moon-env"
-    cat > /usr/local/bin/moon-env << 'EOF'
-GOOGLE_MAPS_API_KEY=REPLACE_WITH_YOUR_KEY
-PROD=True
-EOF
-    echo "[deploy] WARNING: Edit /usr/local/bin/moon-env and set GOOGLE_MAPS_API_KEY"
+if [ -z "$SERVICE_USER" ]; then
+    echo "[deploy] ERROR: Could not read User from moon.service"
+    exit 1
 fi
 
-echo "[deploy] Reloading systemd and enabling service..."
-systemctl daemon-reload
-systemctl enable moon
+echo "[deploy] Installing binary to $DEPLOY_DIR/moon (owner: $SERVICE_USER:$SERVICE_GROUP)..."
+cp "$DEPLOY_SRC/moon" "$DEPLOY_DIR/moon"
+chmod +x "$DEPLOY_DIR/moon"
+
+echo "[deploy] Updating web assets..."
+cp "$DEPLOY_SRC/index.html"    "$DEPLOY_DIR/"
+cp "$DEPLOY_SRC/about.html"    "$DEPLOY_DIR/"
+cp "$DEPLOY_SRC/calendar.html" "$DEPLOY_DIR/"
+cp -r "$DEPLOY_SRC/static/"    "$DEPLOY_DIR/"
+chown -R "$SERVICE_USER:$SERVICE_GROUP" "$DEPLOY_DIR"
 
 echo "[deploy] Restarting service..."
 systemctl restart moon
@@ -104,7 +99,7 @@ if ! systemctl is-active --quiet moon; then
     exit 1
 fi
 
-echo "[deploy] Cleaning up staging directory..."
+echo "[deploy] Cleaning up..."
 rm -rf "$DEPLOY_SRC"
 
 echo "[deploy] Done — moon is running."
@@ -128,32 +123,8 @@ visudo -c -f "$SUDOERS_FILE"
 echo "[ok] sudoers entry created at $SUDOERS_FILE"
 
 # ---------------------------------------------------------------
-# 5. Ensure /var/www/moon exists
+# 5. Print next steps
 # ---------------------------------------------------------------
-mkdir -p /var/www/moon
-chown -R www-data:www-data /var/www/moon
-echo "[ok] /var/www/moon ready"
-
-# ---------------------------------------------------------------
-# 6. Remind about the environment file
-# ---------------------------------------------------------------
-if [ ! -f /usr/local/bin/moon-env ]; then
-    cat > /usr/local/bin/moon-env << 'EOF'
-GOOGLE_MAPS_API_KEY=REPLACE_WITH_YOUR_KEY
-PROD=True
-EOF
-    echo "[ok] Created placeholder /usr/local/bin/moon-env"
-fi
-
-# ---------------------------------------------------------------
-# 7. Print next steps
-# ---------------------------------------------------------------
-echo ""
-echo "=== IMPORTANT: Edit the environment file before first deploy ==="
-echo ""
-echo "  sudo nano /usr/local/bin/moon-env"
-echo ""
-echo "  Set GOOGLE_MAPS_API_KEY to your real key."
 echo ""
 echo "=== Setup complete. Add these secrets to your GitHub repository: ==="
 echo ""
