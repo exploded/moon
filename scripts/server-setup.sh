@@ -53,39 +53,107 @@ chmod 600 "$KEY_DIR/authorized_keys"
 chown -R "$DEPLOY_USER:$DEPLOY_USER" "$KEY_DIR"
 
 # ---------------------------------------------------------------
-# 3. Create sudoers entry (least privilege)
+# 3. Create the server-side deploy script (run as root via sudo)
+# ---------------------------------------------------------------
+cat > /usr/local/bin/deploy-moon << 'DEPLOY_SCRIPT'
+#!/bin/bash
+# /usr/local/bin/deploy-moon
+# Runs as root (via sudo) during GitHub Actions deployments.
+
+set -e
+
+DEPLOY_SRC="${1:-/tmp/moon-deploy}"
+
+echo "[deploy] Installing binary..."
+cp "$DEPLOY_SRC/moon" /usr/local/bin/moon
+chmod +x /usr/local/bin/moon
+
+echo "[deploy] Installing service file..."
+cp "$DEPLOY_SRC/moon.service" /etc/systemd/system/moon.service
+
+echo "[deploy] Updating web assets..."
+mkdir -p /var/www/moon
+cp "$DEPLOY_SRC/index.html"    /var/www/moon/
+cp "$DEPLOY_SRC/about.html"    /var/www/moon/
+cp "$DEPLOY_SRC/calendar.html" /var/www/moon/
+cp -r "$DEPLOY_SRC/static/"    /var/www/moon/
+chown -R www-data:www-data /var/www/moon
+
+# Create environment file if missing — edit it to add your API key
+if [ ! -f /usr/local/bin/moon-env ]; then
+    echo "[deploy] Creating empty environment file at /usr/local/bin/moon-env"
+    cat > /usr/local/bin/moon-env << 'EOF'
+GOOGLE_MAPS_API_KEY=REPLACE_WITH_YOUR_KEY
+PROD=True
+EOF
+    echo "[deploy] WARNING: Edit /usr/local/bin/moon-env and set GOOGLE_MAPS_API_KEY"
+fi
+
+echo "[deploy] Reloading systemd and enabling service..."
+systemctl daemon-reload
+systemctl enable moon
+
+echo "[deploy] Restarting service..."
+systemctl restart moon
+
+echo "[deploy] Verifying service is active..."
+sleep 2
+if ! systemctl is-active --quiet moon; then
+    echo "[deploy] ERROR: Service failed to start. Status:"
+    systemctl status moon --no-pager --lines=30
+    exit 1
+fi
+
+echo "[deploy] Cleaning up staging directory..."
+rm -rf "$DEPLOY_SRC"
+
+echo "[deploy] Done — moon is running."
+DEPLOY_SCRIPT
+
+chmod +x /usr/local/bin/deploy-moon
+echo "[ok] Created /usr/local/bin/deploy-moon"
+
+# ---------------------------------------------------------------
+# 4. Configure sudoers — only allow the one deploy script
 # ---------------------------------------------------------------
 SUDOERS_FILE="/etc/sudoers.d/moon-deploy"
 
 cat > "$SUDOERS_FILE" << 'EOF'
-# Allow the deploy user to install the moon app without a password
-deploy ALL=(ALL) NOPASSWD: \
-    /bin/cp /tmp/moon-deploy/moon /usr/local/bin/moon, \
-    /bin/chmod +x /usr/local/bin/moon, \
-    /bin/cp /tmp/moon-deploy/index.html /var/www/moon/, \
-    /bin/cp /tmp/moon-deploy/about.html /var/www/moon/, \
-    /bin/cp /tmp/moon-deploy/calendar.html /var/www/moon/, \
-    /bin/cp -r /tmp/moon-deploy/static/ /var/www/moon/, \
-    /bin/chown -R www-data\:www-data /var/www/moon, \
-    /usr/bin/systemctl restart moon, \
-    /usr/bin/systemctl is-active moon
+# Allow the deploy user to run the moon deployment script as root
+deploy ALL=(ALL) NOPASSWD: /usr/local/bin/deploy-moon
 EOF
 
 chmod 440 "$SUDOERS_FILE"
-# Validate the file
 visudo -c -f "$SUDOERS_FILE"
 echo "[ok] sudoers entry created at $SUDOERS_FILE"
 
 # ---------------------------------------------------------------
-# 4. Ensure /var/www/moon exists and is owned correctly
+# 5. Ensure /var/www/moon exists
 # ---------------------------------------------------------------
 mkdir -p /var/www/moon
 chown -R www-data:www-data /var/www/moon
 echo "[ok] /var/www/moon ready"
 
 # ---------------------------------------------------------------
-# 5. Print next steps
+# 6. Remind about the environment file
 # ---------------------------------------------------------------
+if [ ! -f /usr/local/bin/moon-env ]; then
+    cat > /usr/local/bin/moon-env << 'EOF'
+GOOGLE_MAPS_API_KEY=REPLACE_WITH_YOUR_KEY
+PROD=True
+EOF
+    echo "[ok] Created placeholder /usr/local/bin/moon-env"
+fi
+
+# ---------------------------------------------------------------
+# 7. Print next steps
+# ---------------------------------------------------------------
+echo ""
+echo "=== IMPORTANT: Edit the environment file before first deploy ==="
+echo ""
+echo "  sudo nano /usr/local/bin/moon-env"
+echo ""
+echo "  Set GOOGLE_MAPS_API_KEY to your real key."
 echo ""
 echo "=== Setup complete. Add these secrets to your GitHub repository: ==="
 echo ""
