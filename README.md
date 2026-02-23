@@ -1,18 +1,18 @@
-# 🌙 Moon Rise and Set Times
+# Moon Rise and Set Times
 
 A web application that calculates and displays moon rise and set times for any location on Earth using Google Maps integration.
 
 ## Features
 
-- 🗺️ Interactive Google Maps interface for location selection
-- 🌍 Automatic geolocation detection
-- 🕐 Smart timezone selector with auto-detection and 50+ timezones
-- 🌙 Real-time moon rise and set calculations
-- 📅 10-day calendar view with sun and moon times
-- 📱 Fully responsive design for mobile and desktop
-- 🔒 Security headers and CSP protection
-- ⚡ Static asset caching for performance
-- ♿ ARIA accessibility features
+- Interactive Google Maps interface for location selection
+- Automatic geolocation detection
+- Smart timezone selector with auto-detection and 50+ timezones
+- Real-time moon rise and set calculations
+- 10-day calendar view with sun and moon times
+- Fully responsive design for mobile and desktop
+- Security headers and CSP protection
+- Static asset caching for performance
+- ARIA accessibility features
 
 ## Technology Stack
 
@@ -25,9 +25,8 @@ A web application that calculates and displays moon rise and set times for any l
 
 - Go 1.21 or higher
 - Google Maps API key with Maps JavaScript API enabled
-- Git (for cloning the repository)
 
-## Installation
+## Local Development
 
 1. **Clone the repository**
    ```bash
@@ -41,16 +40,14 @@ A web application that calculates and displays moon rise and set times for any l
    ```
 
 3. **Set up environment variables**
-   
-   Create a `.env` file (use `.env.example` as template):
    ```bash
    cp .env.example .env
    ```
-   
-   Edit `.env` and add your Google Maps API key:
+   Edit `.env` and set your values:
    ```env
    GOOGLE_MAPS_API_KEY=your_actual_api_key_here
    PROD=False
+   PORT=8484
    ```
 
 4. **Get a Google Maps API Key**
@@ -150,31 +147,15 @@ export PROD="True"
 
 1. Build and install the binary:
    ```bash
-   # Build for Linux
-   go build -o moon
-   
-   # Copy to system binary location
-   sudo cp moon /usr/local/bin/moon
-   sudo chmod +x /usr/local/bin/moon
+   go run moon.go
    ```
+   The server starts on `http://localhost:8484`
 
-2. Create environment file:
-   ```bash
-   sudo nano /usr/local/bin/moon-env
-   ```
-   Add:
-   ```
-   GOOGLE_MAPS_API_KEY=your_key_here
-   PROD=True
-   ```
+### Google Maps API Key
 
-3. Copy application files to working directory:
-   ```bash
-   sudo mkdir -p /var/www/moon
-   sudo cp *.html /var/www/moon/
-   sudo cp -r static /var/www/moon/
-   sudo chown -R www-data:www-data /var/www/moon
-   ```
+- Go to [Google Cloud Console](https://console.cloud.google.com/)
+- Enable "Maps JavaScript API" and create an API key
+- Restrict the key to HTTP referrers (`http://localhost:8484/*` for dev, your domain for prod) and to "Maps JavaScript API" only
 
 4. Install and enable the service:
    ```bash
@@ -327,10 +308,10 @@ Every push to `master` automatically runs tests, builds a Linux binary, and depl
 
 ### How it works
 
-1. GitHub Actions runs tests (`go test`)
+1. GitHub Actions runs `go test`
 2. If tests pass, it cross-compiles a Linux amd64 binary
-3. It SCPs the binary and web assets to your server
-4. It SSHs in and installs them, then restarts the systemd service
+3. It SCPs the binary and web assets to the server
+4. It SSHs in, installs the files, and restarts the systemd service
 
 ### One-time server setup
 
@@ -340,48 +321,31 @@ Run the provided setup script **once** on your Linode server:
 sudo bash scripts/server-setup.sh
 ```
 
-This script:
-- Creates a `deploy` user with a generated SSH key pair
-- Adds a minimal `sudoers` entry so `deploy` can copy files and restart the service
-- Prints the private key and the exact secrets to add to GitHub
+This creates a `deploy` user with SSH keys and the minimal sudoers permissions needed for deployment, then prints the secrets to add to GitHub.
 
 ### GitHub repository secrets
 
-After running the setup script, go to your GitHub repo:
 **Settings → Secrets and variables → Actions → New repository secret**
 
-| Secret name      | Value                                      |
-|------------------|--------------------------------------------|
-| `DEPLOY_HOST`    | Your Linode public IP or hostname          |
-| `DEPLOY_USER`    | `deploy`                                   |
+| Secret name      | Value                                       |
+|------------------|---------------------------------------------|
+| `DEPLOY_HOST`    | Your Linode public IP or hostname           |
+| `DEPLOY_USER`    | `deploy`                                    |
 | `DEPLOY_SSH_KEY` | The private key printed by the setup script |
-| `DEPLOY_PORT`    | Your SSH port (only if not port 22)        |
+| `DEPLOY_PORT`    | Your SSH port (only if not port 22)         |
 
 ### Triggering a deployment
-
-Push to `master`:
 
 ```bash
 git push origin master
 ```
 
-GitHub Actions will:
-1. Run the `Test` job
-2. If tests pass, run the `Deploy to Production` job
-3. Report success or failure in the Actions tab
-
-View deployment logs at:
-`https://github.com/<your-org>/moon/actions`
+View deployment logs at `https://github.com/exploded/moon/actions`
 
 ## Testing
 
-Run the test suite:
 ```bash
 go test -v
-```
-
-Run with coverage:
-```bash
 go test -cover
 ```
 
@@ -416,14 +380,17 @@ moon/
 - `GET /about` - About page
 - `GET /calendar` - Calendar view (query params: lat, lon, zon)
 - `GET /gettimes` - JSON API for moon times (query params: lat, lon, zon)
-- `GET /static/*` - Static assets (cached for 7 days)
+- `GET /static/*` - Static assets (cached 7 days)
 
 ## Configuration
 
 ### Environment Variables
 
-- `GOOGLE_MAPS_API_KEY` - Your Google Maps API key (required)
-- `PROD` - Set to "True" for production mode (default: False)
+| Variable              | Required | Default | Description                        |
+|-----------------------|----------|---------|------------------------------------|
+| `GOOGLE_MAPS_API_KEY` | Yes      | —       | Your Google Maps API key           |
+| `PROD`                | No       | `False` | Set to `True` for production mode  |
+| `PORT`                | No       | `8484`  | Port the server listens on         |
 
 ### Server Settings
 
@@ -435,22 +402,16 @@ moon/
 
 ## Security Features
 
-- X-Content-Type-Options: nosniff
-- X-Frame-Options: DENY
-- X-XSS-Protection: 1; mode=block
+- X-Content-Type-Options, X-Frame-Options, X-XSS-Protection headers
 - Referrer-Policy: strict-origin-when-cross-origin
 - Content-Security-Policy with strict resource restrictions
 - Input validation for latitude, longitude, and timezone
 - Graceful shutdown on SIGTERM/SIGINT
-- API key passed via server-side template rendering (not exposed via endpoint)
-- Encourages Google Maps API key restrictions (HTTP referrers, API restrictions, quotas)
+- API key injected via server-side template rendering (not exposed via endpoint)
 
 ## Browser Support
 
-- Chrome/Edge (latest)
-- Firefox (latest)
-- Safari (latest)
-- Mobile browsers (iOS Safari, Chrome Mobile)
+Chrome/Edge, Firefox, Safari (all latest), iOS Safari, Chrome Mobile.
 
 ## Known Limitations
 
@@ -462,17 +423,7 @@ moon/
 
 Copyright 2020, 2023, 2026 James McHugh
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+Licensed under the Apache License, Version 2.0. See [LICENSE](http://www.apache.org/licenses/LICENSE-2.0).
 
 ## Credits
 
