@@ -54,7 +54,7 @@ if "%GOOGLE_MAPS_API_KEY%"=="your_google_maps_api_key_here" (
 echo API Key loaded: %GOOGLE_MAPS_API_KEY:~0,10%...
 echo Production mode: %PROD%
 echo.
-echo Starting server on http://localhost:8181
+echo Starting server on http://localhost:8484
 echo Press Ctrl+C to stop the server
 echo.
 

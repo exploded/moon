@@ -34,7 +34,7 @@ if "%GOOGLE_MAPS_API_KEY%"=="" (
     exit /b 1
 )
 
-echo Starting server on http://localhost:8181
+echo Starting server on http://localhost:8484
 echo Press Ctrl+C to stop the server
 echo.
 
