@@ -114,12 +114,18 @@ func makeHTTPServer() *http.Server {
 
 func main() {
 	var flgProduction bool
-	var httpPort string = ":8181"
 	if os.Getenv("PROD") == "True" {
 		flgProduction = true
 	} else {
 		flgProduction = false
 	}
+
+	httpPort := os.Getenv("PORT")
+	if httpPort == "" {
+		httpPort = "8181"
+	}
+	httpPort = ":" + httpPort
+
 	log.Printf("Production: %v", flgProduction)
 	log.Printf("HTTP Port: %s", httpPort)
 
