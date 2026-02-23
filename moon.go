@@ -122,7 +122,7 @@ func main() {
 
 	httpPort := os.Getenv("PORT")
 	if httpPort == "" {
-		httpPort = "8181"
+		httpPort = "8484"
 	}
 	httpPort = ":" + httpPort
 
