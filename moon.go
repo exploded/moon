@@ -193,36 +193,80 @@ func calendar(w http.ResponseWriter, r *http.Request) {
 		Zon = 10 // Default
 	}
 
-	type gridrow struct {
-		Date string
-		Moon riseset.RiseSet
-		Sun  riseset.RiseSet
+	// Determine which month to show, defaulting to the current month in the
+	// user's timezone.
+	zondur := time.Hour * time.Duration(Zon)
+	now := time.Now().Add(zondur)
+
+	year, err := strconv.Atoi(r.URL.Query().Get("year"))
+	if err != nil || year < 1 || year > 9999 {
+		year = now.Year()
+	}
+	month, err := strconv.Atoi(r.URL.Query().Get("month"))
+	if err != nil || month < 1 || month > 12 {
+		month = int(now.Month())
 	}
 
-	var arow gridrow
-	var newdate time.Time
+	// Previous / next month navigation (handles year rollovers).
+	prevMonth, prevYear := month-1, year
+	if prevMonth < 1 {
+		prevMonth = 12
+		prevYear--
+	}
+	nextMonth, nextYear := month+1, year
+	if nextMonth > 12 {
+		nextMonth = 1
+		nextYear++
+	}
+
+	// Today's date string in local time, used to highlight the current row.
+	today := now.Format("02-01-2006")
+
+	// Last day of the requested month: day 0 of the following month.
+	lastDay := time.Date(year, time.Month(month+1), 0, 0, 0, 0, 0, time.UTC).Day()
+
+	type gridrow struct {
+		Date    string
+		Moon    riseset.RiseSet
+		Sun     riseset.RiseSet
+		IsToday bool
+	}
 
 	type mypar struct {
-		Rows []gridrow
-		Lon  float64
-		Lat  float64
-		Zon  float64
+		Rows      []gridrow
+		Lon       float64
+		Lat       float64
+		Zon       float64
+		Year      int
+		Month     int
+		MonthName string
+		PrevYear  int
+		PrevMonth int
+		NextYear  int
+		NextMonth int
 	}
 
 	var Passme mypar
 	Passme.Lat = Lat
 	Passme.Lon = Lon
 	Passme.Zon = Zon
+	Passme.Year = year
+	Passme.Month = month
+	Passme.MonthName = time.Month(month).String()
+	Passme.PrevYear = prevYear
+	Passme.PrevMonth = prevMonth
+	Passme.NextYear = nextYear
+	Passme.NextMonth = nextMonth
 
-	var zondur time.Duration = time.Hour * time.Duration(Zon)
-	newdate = time.Now().Add(zondur)
-
-	for i := 0; i < 10; i++ {
-		newdate = newdate.AddDate(0, 0, 1)
-		arow.Date = newdate.Format("02-01-2006")
-		arow.Moon = riseset.Riseset(riseset.Moon, newdate, Lon, Lat, Zon)
-		arow.Sun = riseset.Riseset(riseset.Sun, newdate, Lon, Lat, Zon)
-		Passme.Rows = append(Passme.Rows, arow)
+	for day := 1; day <= lastDay; day++ {
+		d := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+		dateStr := d.Format("02-01-2006")
+		Passme.Rows = append(Passme.Rows, gridrow{
+			Date:    dateStr,
+			Moon:    riseset.Riseset(riseset.Moon, d, Lon, Lat, Zon),
+			Sun:     riseset.Riseset(riseset.Sun, d, Lon, Lat, Zon),
+			IsToday: dateStr == today,
+		})
 	}
 
 	if templates != nil {

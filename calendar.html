@@ -28,6 +28,11 @@
 		<main>
 			<div class="page-content">
 				<div class="card">
+					<div class="month-nav">
+						<a href="calendar?lat={{.Lat}}&lon={{.Lon}}&zon={{.Zon}}&year={{.PrevYear}}&month={{.PrevMonth}}">&#8592;</a>
+						<span>{{.MonthName}} {{.Year}}</span>
+						<a href="calendar?lat={{.Lat}}&lon={{.Lon}}&zon={{.Zon}}&year={{.NextYear}}&month={{.NextMonth}}">&#8594;</a>
+					</div>
 					<table>
 						<thead>
 							<tr>
@@ -40,7 +45,7 @@
 						</thead>
 						<tbody>
 							{{ range .Rows }}
-							<tr>
+							<tr{{if .IsToday}} class="today"{{end}}>
 								<td>{{.Date}}</td>
 								<td>{{if .Moon.AlwaysAbove}}Always above{{else if .Moon.AlwaysBelow}}Always below{{else}}{{.Moon.Rise}}{{end}}</td>
 								<td>{{if .Moon.AlwaysAbove}}Always above{{else if .Moon.AlwaysBelow}}Always below{{else}}{{.Moon.Set}}{{end}}</td>

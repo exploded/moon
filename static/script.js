@@ -274,7 +274,10 @@ function SpinnersChanged() {
 function updateCalLink() {
 	const calendarLink = document.getElementById("callink");
 	if (calendarLink) {
-		calendarLink.href = `calendar?lat=${mylat}&lon=${mylon}&zon=${myzon}`;
+		const now = new Date();
+		const year = now.getFullYear();
+		const month = now.getMonth() + 1;
+		calendarLink.href = `calendar?lat=${mylat}&lon=${mylon}&zon=${myzon}&year=${year}&month=${month}`;
 	}
 }
 

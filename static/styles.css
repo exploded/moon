@@ -325,6 +325,36 @@ table tfoot th {
 	font-size: 14px;
 }
 
+/* Month navigation header */
+.month-nav {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 16px;
+	border-bottom: 1px solid #e0e0e0;
+	font-weight: 600;
+	font-size: 16px;
+	color: #333;
+}
+
+.month-nav a {
+	color: #1976d2;
+	text-decoration: none;
+	font-size: 20px;
+	padding: 4px 10px;
+	border-radius: 4px;
+	transition: background 0.2s ease;
+}
+
+.month-nav a:hover {
+	background-color: #f0f0f0;
+}
+
+/* Today row highlight */
+tr.today td {
+	background-color: #fffde7;
+}
+
 /* Responsive Styles */
 @media (max-width: 768px) {
 	.page-content {
