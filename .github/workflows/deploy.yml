@@ -57,6 +57,15 @@ jobs:
           target: "/tmp/moon-deploy"
           overwrite: true
 
+      - name: Stop service before deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || '22' }}
+          script: sudo systemctl stop moon
+
       - name: Install and restart service
         uses: appleboy/ssh-action@v1.0.3
         with:
