@@ -62,11 +62,23 @@ cat > /usr/local/bin/deploy-moon << 'DEPLOY_SCRIPT'
 #!/bin/bash
 # /usr/local/bin/deploy-moon
 # Runs as root (via sudo) during GitHub Actions deployments.
+#
+# To update this script on the server, include scripts/deploy-moon in the SCP
+# bundle — it will self-update and re-exec before doing anything else.
 
 set -e
 
 DEPLOY_SRC="${1:-/tmp/moon-deploy}"
 DEPLOY_DIR=/var/www/moon
+
+# Self-update: if the bundle contains a newer version of this script, install
+# it and re-exec so the rest of the deployment runs with the updated logic.
+BUNDLE_SCRIPT="$DEPLOY_SRC/scripts/deploy-moon"
+if [ -f "$BUNDLE_SCRIPT" ] && ! diff -q /usr/local/bin/deploy-moon "$BUNDLE_SCRIPT" > /dev/null 2>&1; then
+    echo "[deploy] Updating deploy script from bundle..."
+    install -m 755 "$BUNDLE_SCRIPT" /usr/local/bin/deploy-moon
+    exec /usr/local/bin/deploy-moon "$@"
+fi
 
 # Read the service owner from the installed unit — no hardcoded username
 SERVICE_USER=$(systemctl show moon --property=User --value)
@@ -77,7 +89,11 @@ if [ -z "$SERVICE_USER" ]; then
     exit 1
 fi
 
+echo "[deploy] Stopping service..."
+systemctl stop moon || true
+
 echo "[deploy] Installing binary to $DEPLOY_DIR/moon (owner: $SERVICE_USER:$SERVICE_GROUP)..."
+rm -f "$DEPLOY_DIR/moon"
 cp "$DEPLOY_SRC/moon" "$DEPLOY_DIR/moon"
 chmod +x "$DEPLOY_DIR/moon"
 
@@ -88,8 +104,8 @@ cp "$DEPLOY_SRC/calendar.html" "$DEPLOY_DIR/"
 cp -r "$DEPLOY_SRC/static/"    "$DEPLOY_DIR/"
 chown -R "$SERVICE_USER:$SERVICE_GROUP" "$DEPLOY_DIR"
 
-echo "[deploy] Restarting service..."
-systemctl restart moon
+echo "[deploy] Starting service..."
+systemctl start moon
 
 echo "[deploy] Verifying service is active..."
 sleep 2
@@ -116,6 +132,8 @@ SUDOERS_FILE="/etc/sudoers.d/moon-deploy"
 cat > "$SUDOERS_FILE" << 'EOF'
 # Allow the deploy user to run the moon deployment script as root
 deploy ALL=(ALL) NOPASSWD: /usr/local/bin/deploy-moon
+# Allow stopping the moon service directly (used by the GitHub Actions workflow)
+deploy ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop moon
 EOF
 
 chmod 440 "$SUDOERS_FILE"
