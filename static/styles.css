@@ -352,7 +352,7 @@ table tfoot th {
 
 /* Today row highlight */
 tr.today td {
-	background-color: #fffde7;
+	background-color: #ffe082;
 }
 
 /* Responsive Styles */
