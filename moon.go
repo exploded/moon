@@ -66,12 +66,14 @@ func requestLogger(next http.Handler) http.Handler {
 }
 
 // Add security headers to all responses
-func securityHeaders(next http.Handler) http.Handler {
+func securityHeaders(isProd bool, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
-		w.Header().Set("X-XSS-Protection", "1; mode=block")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		if isProd {
+			w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+		}
 		// CSP allows Google Maps with WebAssembly and all required resources
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://maps.googleapis.com https://code.jquery.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' data: https://maps.googleapis.com https://*.gstatic.com; worker-src blob:")
 		next.ServeHTTP(w, r)
@@ -87,18 +89,18 @@ func cacheStaticAssets(next http.Handler) http.Handler {
 	})
 }
 
-func makeServerFromMux(mux *http.ServeMux) *http.Server {
+func makeServerFromMux(mux *http.ServeMux, isProd bool) *http.Server {
 	// set timeouts so that a slow or malicious client doesn't
 	// hold resources forever
 	return &http.Server{
 		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 5 * time.Second,
-		IdleTimeout:  120 * time.Second,
-		Handler:      requestLogger(securityHeaders(mux)),
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
+		Handler:      requestLogger(securityHeaders(isProd, mux)),
 	}
 }
 
-func makeHTTPServer() *http.Server {
+func makeHTTPServer(isProd bool) *http.Server {
 	mux := &http.ServeMux{}
 	mux.HandleFunc("/", handleIndex)
 	mux.HandleFunc("/about", about)
@@ -111,7 +113,7 @@ func makeHTTPServer() *http.Server {
 	mux.Handle("/static/", http.StripPrefix("/static/", cacheStaticAssets(fileServer)))
 	// 404 handler for all other routes
 	mux.HandleFunc("/404", handle404)
-	return makeServerFromMux(mux)
+	return makeServerFromMux(mux, isProd)
 }
 
 func main() {
@@ -153,7 +155,7 @@ func main() {
 	log.Printf("Production: %v", flgProduction)
 	log.Printf("HTTP Port: %s", httpPort)
 
-	httpSrv := makeHTTPServer()
+	httpSrv := makeHTTPServer(flgProduction)
 	httpSrv.Addr = httpPort
 
 	// Start server in goroutine

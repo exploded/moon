@@ -53,10 +53,77 @@ chmod 600 "$KEY_DIR/authorized_keys"
 chown -R "$DEPLOY_USER:$DEPLOY_USER" "$KEY_DIR"
 
 # ---------------------------------------------------------------
-# 3. Create the server-side deploy script (runs as root via sudo)
-#
-#    Reads User/Group directly from the installed service file so
-#    this script never needs to hardcode a username.
+# 3. Create application directory
+# ---------------------------------------------------------------
+APP_DIR="/var/www/moon"
+if [ -d "$APP_DIR" ]; then
+    echo "[ok] Application directory $APP_DIR already exists"
+else
+    mkdir -p "$APP_DIR"
+    chown www-data:www-data "$APP_DIR"
+    echo "[ok] Created application directory $APP_DIR"
+fi
+
+# ---------------------------------------------------------------
+# 4. Create .env template
+# ---------------------------------------------------------------
+ENV_FILE="$APP_DIR/.env"
+if [ -f "$ENV_FILE" ]; then
+    echo "[ok] .env file already exists at $ENV_FILE (not overwriting)"
+else
+    cat > "$ENV_FILE" << 'ENV_TEMPLATE'
+# Google Maps API Configuration
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+
+# Production flag
+PROD=True
+
+# Port the server listens on (default: 8484)
+PORT=8484
+
+# Monitor portal log shipping (optional)
+MONITOR_URL=
+MONITOR_API_KEY=
+ENV_TEMPLATE
+    chown www-data:www-data "$ENV_FILE"
+    chmod 600 "$ENV_FILE"
+    echo "[ok] Created .env template at $ENV_FILE (edit with real values)"
+fi
+
+# ---------------------------------------------------------------
+# 5. Create systemd service
+# ---------------------------------------------------------------
+SERVICE_FILE="/etc/systemd/system/moon.service"
+cat > "$SERVICE_FILE" << 'SERVICE'
+[Unit]
+Description=Moon Rise and Set Times
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/moon
+EnvironmentFile=/var/www/moon/.env
+ExecStart=/var/www/moon/moon
+Restart=on-failure
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+systemctl daemon-reload
+echo "[ok] Created systemd service at $SERVICE_FILE"
+
+# ---------------------------------------------------------------
+# 6. Create the server-side deploy script (runs as root via sudo)
 # ---------------------------------------------------------------
 cat > /usr/local/bin/deploy-moon << 'DEPLOY_SCRIPT'
 #!/bin/bash
@@ -125,7 +192,7 @@ chmod +x /usr/local/bin/deploy-moon
 echo "[ok] Created /usr/local/bin/deploy-moon"
 
 # ---------------------------------------------------------------
-# 4. Configure sudoers — only allow the one deploy script
+# 7. Configure sudoers — only allow the one deploy script
 # ---------------------------------------------------------------
 SUDOERS_FILE="/etc/sudoers.d/moon-deploy"
 
@@ -141,7 +208,7 @@ visudo -c -f "$SUDOERS_FILE"
 echo "[ok] sudoers entry created at $SUDOERS_FILE"
 
 # ---------------------------------------------------------------
-# 5. Print next steps
+# 8. Print next steps
 # ---------------------------------------------------------------
 echo ""
 echo "=== Setup complete. Add these secrets to your GitHub repository: ==="

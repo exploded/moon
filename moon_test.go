@@ -63,7 +63,7 @@ func TestGettimesMissingParams(t *testing.T) {
 
 // Test security headers middleware
 func TestSecurityHeaders(t *testing.T) {
-	handler := securityHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := securityHeaders(false, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -81,7 +81,6 @@ func TestSecurityHeaders(t *testing.T) {
 	}{
 		{"X-Content-Type-Options", "nosniff"},
 		{"X-Frame-Options", "DENY"},
-		{"X-XSS-Protection", "1; mode=block"},
 		{"Referrer-Policy", "strict-origin-when-cross-origin"},
 	}
 
@@ -89,6 +88,36 @@ func TestSecurityHeaders(t *testing.T) {
 		if got := rr.Header().Get(tt.header); got != tt.want {
 			t.Errorf("security header %s = %v, want %v", tt.header, got, tt.want)
 		}
+	}
+
+	// X-XSS-Protection should NOT be set (deprecated)
+	if got := rr.Header().Get("X-XSS-Protection"); got != "" {
+		t.Errorf("X-XSS-Protection should not be set, got %v", got)
+	}
+
+	// HSTS should NOT be set in non-prod mode
+	if got := rr.Header().Get("Strict-Transport-Security"); got != "" {
+		t.Errorf("HSTS should not be set in non-prod mode, got %v", got)
+	}
+}
+
+// Test HSTS header is set in prod mode
+func TestSecurityHeadersProd(t *testing.T) {
+	handler := securityHeaders(true, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req, err := http.NewRequest("GET", "/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	want := "max-age=63072000; includeSubDomains"
+	if got := rr.Header().Get("Strict-Transport-Security"); got != want {
+		t.Errorf("HSTS header = %v, want %v", got, want)
 	}
 }
 

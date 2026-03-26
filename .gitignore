@@ -21,6 +21,11 @@ Thumbs.db
 *.swp
 *.swo
 
+# Database files
+*.db
+*.db-wal
+*.db-shm
+
 # Build directories
 moon-env/
 dist/
