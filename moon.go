@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -43,7 +42,7 @@ func init() {
 	var err error
 	templates, err = template.ParseGlob("*.html")
 	if err != nil {
-		log.Printf("Warning: Error parsing templates: %v", err)
+		slog.Warn("Error parsing templates", "error", err)
 	}
 }
 
@@ -51,7 +50,7 @@ func init() {
 func getGoogleMapsKey() string {
 	key := os.Getenv("GOOGLE_MAPS_API_KEY")
 	if key == "" {
-		log.Println("WARNING: GOOGLE_MAPS_API_KEY not set in environment")
+		slog.Warn("GOOGLE_MAPS_API_KEY not set in environment")
 	}
 	return key
 }
@@ -61,7 +60,7 @@ func requestLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		next.ServeHTTP(w, r)
-		log.Printf("%s %s %s", r.Method, r.RequestURI, time.Since(start))
+		slog.Info("request", "method", r.Method, "uri", r.RequestURI, "duration", time.Since(start))
 	})
 }
 
@@ -108,7 +107,7 @@ func makeHTTPServer(isProd bool) *http.Server {
 	mux.HandleFunc("/calendar", calendar)
 	mux.HandleFunc("/favicon.ico", handleFavicon)
 	path, _ := os.Getwd()
-	log.Printf("Working directory: %s", path)
+	slog.Info("Working directory", "path", path)
 	fileServer := http.FileServer(http.Dir(path + "/static"))
 	mux.Handle("/static/", http.StripPrefix("/static/", cacheStaticAssets(fileServer)))
 	// 404 handler for all other routes
@@ -152,17 +151,18 @@ func main() {
 		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
 	}
 
-	log.Printf("Production: %v", flgProduction)
-	log.Printf("HTTP Port: %s", httpPort)
+	slog.Info("Production", "enabled", flgProduction)
+	slog.Info("HTTP Port", "port", httpPort)
 
 	httpSrv := makeHTTPServer(flgProduction)
 	httpSrv.Addr = httpPort
 
 	// Start server in goroutine
 	go func() {
-		log.Printf("Starting HTTP server on %s", httpSrv.Addr)
+		slog.Info("Starting HTTP server", "addr", httpSrv.Addr)
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("httpSrv.ListenAndServe() failed: %v", err)
+			slog.Error("httpSrv.ListenAndServe() failed", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -170,23 +170,23 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down server...")
+	slog.Info("Shutting down server...")
 
 	// Give outstanding requests 5 seconds to complete
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := httpSrv.Shutdown(ctx); err != nil {
-		log.Printf("Server forced to shutdown: %v", err)
+		slog.Error("Server forced to shutdown", "error", err)
 	}
 
-	log.Println("Server exited")
+	slog.Info("Server exited")
 }
 
 func about(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if templates != nil {
 		if err := templates.ExecuteTemplate(w, "about.html", nil); err != nil {
-			log.Printf("Error executing about template: %v", err)
+			slog.Error("Error executing about template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 	} else {
@@ -194,11 +194,11 @@ func about(w http.ResponseWriter, r *http.Request) {
 		t, err := template.ParseFiles("about.html")
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			log.Printf("Error parsing about template: %v", err)
+			slog.Error("Error parsing about template", "error", err)
 			return
 		}
 		if err := t.Execute(w, nil); err != nil {
-			log.Printf("Error executing about template: %v", err)
+			slog.Error("Error executing about template", "error", err)
 		}
 	}
 }
@@ -297,7 +297,7 @@ func calendar(w http.ResponseWriter, r *http.Request) {
 
 	if templates != nil {
 		if err := templates.ExecuteTemplate(w, "calendar.html", &Passme); err != nil {
-			log.Printf("Error executing calendar template: %v", err)
+			slog.Error("Error executing calendar template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 	} else {
@@ -305,11 +305,11 @@ func calendar(w http.ResponseWriter, r *http.Request) {
 		t, err := template.ParseFiles("calendar.html")
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			log.Printf("Error parsing calendar template: %v", err)
+			slog.Error("Error parsing calendar template", "error", err)
 			return
 		}
 		if err := t.Execute(w, &Passme); err != nil {
-			log.Printf("Error executing calendar template: %v", err)
+			slog.Error("Error executing calendar template", "error", err)
 		}
 	}
 }
@@ -327,7 +327,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	
 	if templates != nil {
 		if err := templates.ExecuteTemplate(w, "index.html", data); err != nil {
-			log.Printf("Error executing index template: %v", err)
+			slog.Error("Error executing index template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 	} else {
@@ -335,11 +335,11 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		t, err := template.ParseFiles("index.html")
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			log.Printf("Error parsing index template: %v", err)
+			slog.Error("Error parsing index template", "error", err)
 			return
 		}
 		if err := t.Execute(w, data); err != nil {
-			log.Printf("Error executing index template: %v", err)
+			slog.Error("Error executing index template", "error", err)
 		}
 	}
 }
