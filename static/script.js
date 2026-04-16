@@ -252,32 +252,31 @@ function addListener(marker) {
 
 // Detect when user changed lat or long input, and move the marker in the map
 function SpinnersChanged() {
-	const newLat = $('#lat').val();
-	const newLon = $('#lon').val();
-	
-	// Validate coordinates
-	if (newLat < -90 || newLat > 90 || newLon < -180 || newLon > 180) {
+	const newLat = parseFloat(document.getElementById('lat').value);
+	const newLon = parseFloat(document.getElementById('lon').value);
+
+	if (!Number.isFinite(newLat) || !Number.isFinite(newLon) ||
+		newLat < -90 || newLat > 90 || newLon < -180 || newLon > 180) {
 		showErrorMessage('Invalid coordinates. Latitude: -90 to 90, Longitude: -180 to 180');
 		return;
 	}
-	
+
 	mylat = newLat;
 	mylon = newLon;
-	
+
 	moveMarker();
 	getTimes();
 	updateCalLink();
 	clearErrorMessage();
 }
 
-// Change the calendar link after a lat/lon change
+// Change the calendar link after a lat/lon change.
+// Year/month are omitted so the server defaults to "today in the selected
+// timezone" — more accurate than using browser-local time here.
 function updateCalLink() {
 	const calendarLink = document.getElementById("callink");
 	if (calendarLink) {
-		const now = new Date();
-		const year = now.getFullYear();
-		const month = now.getMonth() + 1;
-		calendarLink.href = `calendar?lat=${mylat}&lon=${mylon}&zon=${myzon}&year=${year}&month=${month}`;
+		calendarLink.href = `calendar?lat=${mylat}&lon=${mylon}&zon=${myzon}`;
 	}
 }
 
@@ -290,31 +289,35 @@ function updateSpinners() {
 }
 
 // Get the rise and set times from the server
-const getTimes = function () {
-	const zon = $('#zon').val();
+const getTimes = async function () {
+	const zon = document.getElementById('zon').value;
 	myzon = zon;
-	
-	$.getJSON(`gettimes?lon=${mylon}&lat=${mylat}&zon=${zon}`)
-		.done((json) => {
-			if (json.Rise === "error" || json.Set === "error") {
-				showErrorMessage('Unable to calculate moon times for this location.');
-			} else if (json.AlwaysAbove) {
-				updateInputField("Rise", "Always above horizon");
-				updateInputField("Set", "Always above horizon");
-				clearErrorMessage();
-			} else if (json.AlwaysBelow) {
-				updateInputField("Rise", "Always below horizon");
-				updateInputField("Set", "Always below horizon");
-				clearErrorMessage();
-			} else if (json.Rise && json.Set) {
-				updateInputField("Rise", json.Rise);
-				updateInputField("Set", json.Set);
-				clearErrorMessage();
-			}
-		})
-		.fail((jqXHR, textStatus, errorThrown) => {
-			showErrorMessage('Failed to get moon rise/set times. Please try again.');
-		});
+
+	try {
+		const resp = await fetch(`gettimes?lon=${mylon}&lat=${mylat}&zon=${zon}`);
+		if (!resp.ok) {
+			throw new Error(`HTTP ${resp.status}`);
+		}
+		const json = await resp.json();
+
+		if (json.Error) {
+			showErrorMessage('Unable to calculate moon times for this location.');
+		} else if (json.AlwaysAbove) {
+			updateInputField("Rise", "Always above horizon");
+			updateInputField("Set", "Always above horizon");
+			clearErrorMessage();
+		} else if (json.AlwaysBelow) {
+			updateInputField("Rise", "Always below horizon");
+			updateInputField("Set", "Always below horizon");
+			clearErrorMessage();
+		} else if (json.Rise && json.Set) {
+			updateInputField("Rise", json.Rise);
+			updateInputField("Set", json.Set);
+			clearErrorMessage();
+		}
+	} catch (err) {
+		showErrorMessage('Failed to get moon rise/set times. Please try again.');
+	}
 };
 
 function showError(error) {
@@ -368,4 +371,18 @@ window.addEventListener('resize', () => {
 	if (myMap) {
 		google.maps.event.trigger(myMap, 'resize');
 	}
+});
+
+// Attach event listeners without relying on inline on* handlers,
+// so the CSP can forbid 'unsafe-inline' for script-src.
+document.addEventListener('DOMContentLoaded', () => {
+	const latEl = document.getElementById('lat');
+	const lonEl = document.getElementById('lon');
+	const tzEl = document.getElementById('timezone');
+	const locBtn = document.getElementById('useMyLocationBtn');
+
+	if (latEl) latEl.addEventListener('change', SpinnersChanged);
+	if (lonEl) lonEl.addEventListener('change', SpinnersChanged);
+	if (tzEl) tzEl.addEventListener('change', timezoneChanged);
+	if (locBtn) locBtn.addEventListener('click', refresh);
 });

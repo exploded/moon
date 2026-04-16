@@ -20,7 +20,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"log/slog"
 	"net/http"
@@ -37,13 +36,25 @@ import (
 // Template cache
 var templates *template.Template
 
-// Initialize templates at startup
+// Keith Burnett's QBASIC source, mirrored alongside the archive page and
+// injected into templates/archive.html for display + copy-to-clipboard.
+var risetBasSource string
+
+// Initialize templates at startup. Panic on failure: the handlers depend
+// on every template being present, and a silent fallback would mask
+// configuration errors in prod.
 func init() {
 	var err error
-	templates, err = template.ParseGlob("*.html")
+	templates, err = template.ParseGlob("templates/*.html")
 	if err != nil {
-		slog.Warn("Error parsing templates", "error", err)
+		panic("failed to parse templates: " + err.Error())
 	}
+
+	bas, err := os.ReadFile("templates/riset.bas")
+	if err != nil {
+		panic("failed to read templates/riset.bas: " + err.Error())
+	}
+	risetBasSource = string(bas)
 }
 
 // Get Google Maps API key from environment variable
@@ -73,8 +84,15 @@ func securityHeaders(isProd bool, next http.Handler) http.Handler {
 		if isProd {
 			w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
 		}
-		// CSP allows Google Maps with WebAssembly and all required resources
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://maps.googleapis.com https://code.jquery.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' data: https://maps.googleapis.com https://*.gstatic.com; worker-src blob:")
+		// CSP: all allowances beyond 'self' are driven by Google Maps
+		// (the only remaining external origin).
+		//   script-src: 'unsafe-eval' + blob: + maps.googleapis.com — required by Maps.
+		//   style-src:  fonts.googleapis.com — Maps injects a Roboto/Google Sans
+		//              stylesheet at runtime. 'unsafe-inline' — Maps sets inline
+		//              styles on markers/controls.
+		//   font-src:   fonts.gstatic.com — font files for the above stylesheet.
+		//   img-src:    *.googleapis.com / *.gstatic.com — Maps tiles and icons.
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-eval' blob: https://maps.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' data: https://maps.googleapis.com https://*.gstatic.com; worker-src blob:")
 		next.ServeHTTP(w, r)
 	})
 }
@@ -105,23 +123,17 @@ func makeHTTPServer(isProd bool) *http.Server {
 	mux.HandleFunc("/about", about)
 	mux.HandleFunc("/gettimes", gettimes)
 	mux.HandleFunc("/calendar", calendar)
+	mux.HandleFunc("/archive", handleArchive)
 	mux.HandleFunc("/favicon.ico", handleFavicon)
 	path, _ := os.Getwd()
 	slog.Info("Working directory", "path", path)
 	fileServer := http.FileServer(http.Dir(path + "/static"))
 	mux.Handle("/static/", http.StripPrefix("/static/", cacheStaticAssets(fileServer)))
-	// 404 handler for all other routes
-	mux.HandleFunc("/404", handle404)
 	return makeServerFromMux(mux, isProd)
 }
 
 func main() {
-	var flgProduction bool
-	if os.Getenv("PROD") == "True" {
-		flgProduction = true
-	} else {
-		flgProduction = false
-	}
+	flgProduction := os.Getenv("PROD") == "True"
 
 	httpPort := os.Getenv("PORT")
 	if httpPort == "" {
@@ -185,22 +197,9 @@ func main() {
 
 func about(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if templates != nil {
-		if err := templates.ExecuteTemplate(w, "about.html", nil); err != nil {
-			slog.Error("Error executing about template", "error", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		}
-	} else {
-		// Fallback to parsing on demand
-		t, err := template.ParseFiles("about.html")
-		if err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			slog.Error("Error parsing about template", "error", err)
-			return
-		}
-		if err := t.Execute(w, nil); err != nil {
-			slog.Error("Error executing about template", "error", err)
-		}
+	if err := templates.ExecuteTemplate(w, "about.html", nil); err != nil {
+		slog.Error("Error executing about template", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
 
@@ -221,9 +220,10 @@ func calendar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Determine which month to show, defaulting to the current month in the
-	// user's timezone.
+	// user's timezone. We shift from UTC explicitly so the result doesn't
+	// depend on the server's local time zone.
 	zondur := time.Hour * time.Duration(Zon)
-	now := time.Now().Add(zondur)
+	now := time.Now().UTC().Add(zondur)
 
 	year, err := strconv.Atoi(r.URL.Query().Get("year"))
 	if err != nil || year < 1 || year > 9999 {
@@ -250,6 +250,8 @@ func calendar(w http.ResponseWriter, r *http.Request) {
 	today := now.Format("02-01-2006")
 
 	// Last day of the requested month: day 0 of the following month.
+	// time.Date normalizes month=13 to January of year+1, so December works
+	// without a special case.
 	lastDay := time.Date(year, time.Month(month+1), 0, 0, 0, 0, 0, time.UTC).Day()
 
 	type gridrow struct {
@@ -296,92 +298,92 @@ func calendar(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	if templates != nil {
-		if err := templates.ExecuteTemplate(w, "calendar.html", &Passme); err != nil {
-			slog.Error("Error executing calendar template", "error", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		}
-	} else {
-		// Fallback to parsing on demand
-		t, err := template.ParseFiles("calendar.html")
-		if err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			slog.Error("Error parsing calendar template", "error", err)
-			return
-		}
-		if err := t.Execute(w, &Passme); err != nil {
-			slog.Error("Error executing calendar template", "error", err)
-		}
+	if err := templates.ExecuteTemplate(w, "calendar.html", &Passme); err != nil {
+		slog.Error("Error executing calendar template", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
+	// ServeMux routes all unmatched paths to "/", so treat anything other than
+	// the root as a 404.
+	if r.URL.Path != "/" {
+		handle404(w, r)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	
-	type IndexData struct {
-		GoogleMapsKey string
+
+	data := struct{ GoogleMapsKey string }{GoogleMapsKey: getGoogleMapsKey()}
+
+	if err := templates.ExecuteTemplate(w, "index.html", data); err != nil {
+		slog.Error("Error executing index template", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
-	
-	data := IndexData{
-		GoogleMapsKey: getGoogleMapsKey(),
-	}
-	
-	if templates != nil {
-		if err := templates.ExecuteTemplate(w, "index.html", data); err != nil {
-			slog.Error("Error executing index template", "error", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		}
-	} else {
-		// Fallback to parsing on demand
-		t, err := template.ParseFiles("index.html")
-		if err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			slog.Error("Error parsing index template", "error", err)
-			return
-		}
-		if err := t.Execute(w, data); err != nil {
-			slog.Error("Error executing index template", "error", err)
-		}
-	}
+}
+
+// timesResponse is the JSON shape returned by /gettimes. On success the
+// riseset.RiseSet fields are populated; on error, Error is set and the
+// rest are zero-valued.
+type timesResponse struct {
+	Rise        string `json:",omitempty"`
+	Set         string `json:",omitempty"`
+	AlwaysAbove bool   `json:",omitempty"`
+	AlwaysBelow bool   `json:",omitempty"`
+	Error       string `json:",omitempty"`
 }
 
 func gettimes(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	enc := json.NewEncoder(w)
+
+	writeErr := func(msg string) {
+		_ = enc.Encode(timesResponse{Error: msg})
+	}
+
 	a := r.URL.Query().Get("lon")
 	b := r.URL.Query().Get("lat")
 	c := r.URL.Query().Get("zon")
-	var mydata riseset.RiseSet
 	if a == "" || b == "" || c == "" {
-		mydata = riseset.RiseSet{Rise: "error", Set: "error"}
-	} else {
-		lon, err := strconv.ParseFloat(a, 64)
-		if err != nil || lon < -180 || lon > 180 {
-			mydata = riseset.RiseSet{Rise: "error", Set: "error"}
-			json.NewEncoder(w).Encode(mydata)
-			return
-		}
-		lat, err := strconv.ParseFloat(b, 64)
-		if err != nil || lat < -90 || lat > 90 {
-			mydata = riseset.RiseSet{Rise: "error", Set: "error"}
-			json.NewEncoder(w).Encode(mydata)
-			return
-		}
-		zon, err := strconv.ParseFloat(c, 64)
-		if err != nil || zon < -12 || zon > 14 {
-			mydata = riseset.RiseSet{Rise: "error", Set: "error"}
-			json.NewEncoder(w).Encode(mydata)
-			return
-		}
-		var zondur time.Duration
-		var newdate time.Time
-		zondur = time.Hour * time.Duration(zon)
-		newdate = time.Now().Add(zondur)
-		mydata = riseset.Riseset(riseset.Moon, newdate, lon, lat, zon)
+		writeErr("missing lon, lat, or zon parameter")
+		return
 	}
-	json.NewEncoder(w).Encode(mydata)
+	lon, err := strconv.ParseFloat(a, 64)
+	if err != nil || lon < -180 || lon > 180 {
+		writeErr("invalid lon")
+		return
+	}
+	lat, err := strconv.ParseFloat(b, 64)
+	if err != nil || lat < -90 || lat > 90 {
+		writeErr("invalid lat")
+		return
+	}
+	zon, err := strconv.ParseFloat(c, 64)
+	if err != nil || zon < -12 || zon > 14 {
+		writeErr("invalid zon")
+		return
+	}
+
+	// Shift UTC "now" by the client's timezone offset so the date portion
+	// matches the client's local wall-clock date. riseset uses only the date.
+	newdate := time.Now().UTC().Add(time.Hour * time.Duration(zon))
+	rs := riseset.Riseset(riseset.Moon, newdate, lon, lat, zon)
+	_ = enc.Encode(timesResponse{
+		Rise:        rs.Rise,
+		Set:         rs.Set,
+		AlwaysAbove: rs.AlwaysAbove,
+		AlwaysBelow: rs.AlwaysBelow,
+	})
 }
 
-
+func handleArchive(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	data := struct{ Code string }{Code: risetBasSource}
+	if err := templates.ExecuteTemplate(w, "archive.html", data); err != nil {
+		slog.Error("Error executing archive template", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
+}
 
 func handleFavicon(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "favicon.ico")
@@ -390,39 +392,7 @@ func handleFavicon(w http.ResponseWriter, r *http.Request) {
 func handle404(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusNotFound)
-	fmt.Fprint(w, `<!DOCTYPE html>
-<html lang="en">
-<head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>404 - Page Not Found</title>
-	<link rel="stylesheet" href="/static/styles.css">
-</head>
-<body>
-	<div class="container">
-		<header>
-			<div class="header-row">
-				<h1 class="header-title">🌙 Moon Rise and Set Times</h1>
-				<div class="spacer"></div>
-				<nav class="nav">
-					<a class="nav-link" href="/"><i class="material-icons" style="font-size: 18px;">home</i> Home</a>
-					<a class="nav-link" href="/about">About</a>
-					<a class="nav-link" href="/calendar">Calendar</a>
-				</nav>
-			</div>
-		</header>
-		<main>
-			<div class="page-content">
-				<div class="card">
-					<div class="card-content" style="text-align: center; padding: 60px 24px;">
-						<h2 style="color: white; margin: 0 0 16px 0;">404 - Page Not Found</h2>
-						<p style="color: rgba(255,255,255,0.9); margin: 0 0 24px 0;">The page you're looking for doesn't exist.</p>
-						<a href="/" class="btn">Go to Home</a>
-					</div>
-				</div>
-			</div>
-		</main>
-	</div>
-</body>
-</html>`)
+	if err := templates.ExecuteTemplate(w, "404.html", nil); err != nil {
+		slog.Error("Error executing 404 template", "error", err)
+	}
 }

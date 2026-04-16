@@ -37,9 +37,9 @@ cp "$DEPLOY_SRC/moon" "$DEPLOY_DIR/moon"
 chmod +x "$DEPLOY_DIR/moon"
 
 echo "[deploy] Updating web assets..."
-cp "$DEPLOY_SRC/index.html"    "$DEPLOY_DIR/"
-cp "$DEPLOY_SRC/about.html"    "$DEPLOY_DIR/"
-cp "$DEPLOY_SRC/calendar.html" "$DEPLOY_DIR/"
+rm -rf "$DEPLOY_DIR/templates"
+cp -r "$DEPLOY_SRC/templates/" "$DEPLOY_DIR/"
+cp "$DEPLOY_SRC/favicon.ico"   "$DEPLOY_DIR/"
 cp -r "$DEPLOY_SRC/static/"    "$DEPLOY_DIR/"
 chown -R "$SERVICE_USER:$SERVICE_GROUP" "$DEPLOY_DIR"
 
@@ -47,7 +47,12 @@ echo "[deploy] Starting service..."
 systemctl start moon
 
 echo "[deploy] Verifying service is active..."
-sleep 2
+for i in 1 2 3 4 5; do
+    if systemctl is-active --quiet moon; then
+        break
+    fi
+    sleep 1
+done
 if ! systemctl is-active --quiet moon; then
     echo "[deploy] ERROR: Service failed to start. Status:"
     systemctl status moon --no-pager --lines=30

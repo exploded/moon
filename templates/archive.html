@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Moon and Sun rise and set for any latitude — Keith Burnett (archived)</title>
+	<link rel="stylesheet" href="/static/styles.css">
+</head>
+
+<body class="archived-page">
+	<div class="archive-notice">
+		<strong>Archived copy.</strong> The original page at
+		<code>https://stargazing.net/kepler/moonrise.html</code> by Keith Burnett
+		went offline. This local copy was saved from the
+		<a href="https://web.archive.org/web/20260228085358/https://stargazing.net/kepler/moonrise.html">Wayback Machine capture of 28&nbsp;Feb&nbsp;2026</a>
+		because the algorithm described here is the basis for this site's moon
+		and sun rise/set calculations (via the
+		<a href="https://github.com/exploded/riseset">riseset</a> Go library).
+		Content is preserved verbatim aside from removing the Wayback Machine
+		toolbar, rewriting relative links, and inlining the QBASIC source
+		listing below.
+	</div>
+
+	<h1><a id="twig00">Moon and Sun rise and set for any latitude</a></h1>
+	<hr>
+
+	<h2>Contents</h2>
+	<ul>
+		<li><a href="#twig01">Overview</a>
+			<ul>
+				<li><a href="#twig01a">Definitions and the problem</a>
+				<li><a href="#twig01b">Different algorithms</a>
+				<li><a href="#twig02">Quadratic interpolation method</a>
+			</ul>
+		<li><a href="#twig03">QBASIC listing</a>
+		<li><a href="#twig05">References</a>
+	</ul>
+
+	<h2><a id="twig01">Overview</a></h2>
+	[ <a href="#twig00">Top</a> ]
+
+	<p>This page describes an algorithm that will enable you to calculate
+	the time of Moon rise and set and Sun rise and set, as well as the
+	twilight times, for any latitude on the Earth's surface. The algorithm
+	presented here will warn you if the Moon or Sun remains above or below
+	the horizon all day (a definite possibility above latitudes of 66.5
+	degrees North), or if the object does not rise or set within the day
+	chosen (the Moon will exhibit this behaviour on one day in each lunar
+	cycle).
+
+	<p>If you just want the <em>results</em> for your observing location, then
+	I recommend the <a href="https://web.archive.org/web/20260228085358/http://aa.usno.navy.mil/aa/data/">Web page
+	based programs</a> provided by the US Naval Observatory. One of these
+	programs will give you a compact yearly calendar style printout of rise
+	and set times at a given location on a single sheet of paper. I use a
+	set of printouts in my own observation planning - its easier than
+	switching on the computer!
+
+	<p>In the <em>implementation</em> of the algorithm on this page, I have
+	used approximate routines to calculate the coordinates of the Sun and
+	Moon. You can choose latitudes where the program will predict a very
+	short day when the Sun really remains below the horizon all day - this
+	inaccuracy affects latitudes close to 67.43 degrees North, and you can
+	imagine a 'fuzzy zone' around the Earth at this latitude (and a mirror
+	image one in the South) where the program may be in error. I suspect
+	that more accurate position routines and better approximations for
+	topocentric parallax, refraction and the diameter of the Sun and Moon
+	would shrink this 'fuzzy zone', at the cost of increased complexity.
+
+	<p>The algorithm is implemented in <code>QBASIC</code>, a well
+	structured interpreted basic available free for Windows computers, and
+	easily adapted to Visual Basic syntax. The implementation is based very
+	closely on <code>PASCAL</code> routines taken from <cite>Montenbruck and
+	Pfleger</cite>.
+
+	<h3><a id="twig01a">Definitions and the problem</a></h3>
+	[ <a href="#twig00">Top</a> ]
+
+	<p>The rising and setting of the Sun and Moon is defined here to be the
+	instant when the <em>upper limb</em> of the object is seen to cross a
+	mathematically flat horizon by an observer at sea level. Real observing
+	situations on land rarely approach this idealised model, and for my uses
+	calculating rise and set times to the nearest minute is fine.
+
+	<p>The following factors need to be addressed
+
+	<ul>
+		<li>The Sun and Moon vary in position against the stars over a
+		period of one day - the Moon moves about 12 degrees per day on average.
+
+		<li>There are latitudes on Earth where the Sun and Moon can be above or
+		below the horizon for days at a time. The algorithm has to detect and
+		report these circumstances.
+
+		<li>The time of Moonset will be about 50 minutes later each night after
+		New Moon. There will be at least one day in each lunation during which
+		the Moon does not set, and one day where the Moon does not rise. The
+		algorithm must report these days.
+
+		<li>You must calculate the altitude of the Sun and the Moon as seen by
+		the observer on the <em>surface</em> of the Earth - allowing for
+		parallax from the geocentric coordinates.
+
+		<li>You must correct for the effects of atmospheric refraction (not
+		relevant for the twilights).
+
+		<li>You must allow for the size of the Sun or Moon's disc (except for
+		the twilights).
+	</ul>
+
+	<p>In <cite>Montenbruck and Pfleger</cite>'s approximate implementation,
+	the last three points above boil down to subtracting a single correction
+	term from the geocentric altitude of the Moon or Sun when looking for
+	rise or setting events.
+
+	<ul>
+		<li>Sunrise occurs when the centre of the Sun's disc is at a geocentric
+		altitude of -50 arc minutes.
+
+		<li>Moon rise occurs when the centre of the Moon's disc is at a
+		geocentric altitude of +8 arc minutes.
+
+		<li>Nautical twilight is defined to be when the centre of the Sun is at
+		a geocentric altitude of -12 degrees.
+	</ul>
+
+	<p>The large difference between the Moon and the Sun correction reflects
+	the much larger parallax effect on Moon positions - roughly 1 degree for
+	the Moon compared to 9 arc seconds for the Sun.
+
+	<h3><a id="twig01b">Different algorithms</a></h3>
+	[ <a href="#twig00">Top</a> ]
+
+	<p>Possible algorithms include:-
+
+	<ul>
+		<li>Use a single position and calculate as for a star
+		<li>Use a 'trial and improvement' or 'iterative' method
+		<li>Use a table based interpolation method
+	</ul>
+
+	<p>I used the 'single position and calculate as for star' method on a
+	programmable calculator - the results for the Sun at moderate latitudes
+	were 20 minutes or so wrong. Given the state of the local horizon, this
+	was not much of a problem. This 'method' was very poor for the Moon,
+	almost worse than guessing from the number of days since New Moon.
+
+	<p>The 'trial and improvement' method with allowance for refraction,
+	parallax and disc size is much better, and can give good results for the
+	Sun for latitudes below 65N. The method will mostly converge after a few
+	iterations - see
+	<a href="https://web.archive.org/web/20001201205400/http://hotel04.ausys.se/pausch/comp/ppcomp.html">Paul Schlyter's
+	page</a>.
+
+	<p>Tral and improvement methods get fiddly in situations where the
+	object remains above or below the horizon for a number of days, or where
+	the object does not set one day or the next.
+
+	<p>A table based method could be very simple - just calculate the
+	altitude of the Moon for each minute of the day and find when the
+	altitude changes sign. There is your rising or setting event.
+
+	<p>This simple table based method could detect the 'always above the
+	horizon' or 'always below the horizon' situations as the (corrected)
+	altitude would never change sign over the day. The method could also
+	cope with the Moon missing a rise or set each lunar cycle, but 'grazing'
+	situations, where the Sun never quite dips below the horizon, would be
+	more difficult as there would be no sign change in the altitudes. A real
+	program based on this system would be really slow, requiring at worst
+	case 1440 calculations of altitude for each object for each day.
+
+	<h3><a id="twig02">Quadratic interpolation method</a></h3>
+	[ <a href="#twig00">Top</a> ]
+
+	<p>Interpolation based methods use a shorter table of altitudes - in my
+	implementation we use a table with a maximum of 12 rows - and fit a
+	quadratic function to each set of three altitudes in turn. We then use
+	some GCSE algebra to find the times when the quadratic crosses the X
+	axis - has zero altitude - and these times are candidates for a rising
+	or setting event. This system can also deal with the situation when the
+	rising and setting occur within the hour - the quadratic then has two
+	zeros. Finally, if the two zeros are the same, then there must be a
+	'grazing' event in that interval, and the algorithm can detect the
+	event.
+
+	<p>The steps in the procedure are
+
+	<ol>
+		<li>Calculate the sine of the altitude (corrected for refraction,
+		parallax and the limb radius) for the first three hours in the day.
+		Using the sine of the altitude saves some calculation and means that the
+		values will always be within the range +1 to -1.
+
+		<li>Save sign of the altitude at 0h
+
+		<li>Take the values of the sine of the altitude for each set of three
+		consecutive hours, correct for the refraction, parallax and fit a
+		quadratic curve through these three points. See <cite>Montenbruck and
+		Pfleger</cite> for algebra.
+
+		<li>Calculate the 'discriminant' for the quadratic, and classify as
+			<ul>
+				<li>No roots within the 2 hour interval - move onto the next 2 hour
+				range and start from step 1
+
+				<li>Two roots, one root within the interval - classify as rising or
+				setting event and appropriate flag
+					<ul>
+						<li>If two flags set, i.e. rising and setting events both found, go to
+						step 5
+
+						<li>If one flag set, then return to step 1 for next two hour interval,
+						to search for remaining event.
+					</ul>
+
+				<li>Two roots, both within the interval - set the rising and setting
+				flags and go to step 5.
+
+				<li>One root (i.e. both roots same) within interval - set both rising
+				and setting flags and go to step 5.
+			</ul>
+
+		<li>If neither rise nor set flag is set, then warn user that object is
+		'always above' or 'always below' horizon depending on the sign of the
+		altitude in step 2, and move onto next object or quit.
+
+		<li>Print rise and set times, or message if one event missing in current
+		day.
+
+		<li>Move onto next object or quit.
+	</ol>
+
+	<h2><a id="twig03">QBASIC listing and test data</a></h2>
+	[ <a href="#twig00">Top</a> ]
+
+	<p>You can expand the tested <code>QBASIC</code> code below. The
+	<code>QBASIC</code> editor insists on adding functions and subroutines
+	to the end of the listing in alphabetical order - which does not make
+	reading the code any easier. I have added comments in the 'main' program
+	that should help you link the code to the description of the algorithm
+	above.
+
+	<details class="code-details">
+		<summary>Show QBASIC source (<code>riset.bas</code>)</summary>
+		<div class="code-toolbar">
+			<span class="code-lang">QBASIC</span>
+			<button id="copy-bas" class="copy-btn" type="button" aria-label="Copy source code">Copy</button>
+		</div>
+		<pre><code id="bas-code">{{.Code}}</code></pre>
+	</details>
+
+	<h3>Test data</h3>
+
+	<p>Below are some samples of program input and output, together with
+	accurate results from Chris Marriott's
+	<a href="https://web.archive.org/web/20000229041410/http://www.skymap.com/smp_eval.htm">SkyMap Pro 6.0</a> and with a
+	year 2000 calendar for the Sun, Moon and Nautical Twilight generated
+	from the USNO web based program.
+
+	<h4>Case 1</h4>
+
+	<p>Rise and set times for today in Birmingham UK - simple case with no
+	ambiguities. Below is the dialogue with the QBASIC program. Times of
+	events are given in form <code>hhmm</code>, and are UT times.
+
+	<pre>
+   Rise and set for Sun and Moon
+   =============================
+
+   Year (yyyy) - - - - - - - - :2000
+   Month  (mm) - - - - - - - - :1
+   Day    (dd) - - - - - - - - :3
+   Time zone (East +) - - - -  :0
+   Longitude (w neg, decimals) :-1.91667
+   Latitude  (n pos, decimals) :52.5
+
+   Moon
+     501
+    1409
+
+   Sun
+     818
+    1606
+
+   Nautical twilight
+     653
+    1731
+</pre>
+
+	<p>Skymap Pro gives the following times for the Sun and Moon on 2000 Jan
+	3 - agreement is fine to nearest minute, except for Moonrise that rounds
+	the wrong way to give a result one minute different from the USNO tables.
+
+	<pre>
+Sunrise and twilight
+Date           Rise        Set         Naut Twi E    Naut Twi B
+03 Jan 2000    08:18:11    16:05:50    17:30:56      06:53:06
+
+Moonrise
+Rise: 5h 0m 23s
+Set: 14h 9m 18s
+</pre>
+
+	<h4>Case 2</h4>
+
+	For 1999 December 25th at a made up location of 0 Longitude, 67.43
+	latitude, the <code>QBASIC</code> program gives a 'day' lasting 8
+	minutes:
+
+	<pre>
+   Rise and set for Sun and Moon
+   =============================
+
+   Year (yyyy) - - - - - - - - :1999
+   Month  (mm) - - - - - - - - :12
+   Day    (dd) - - - - - - - - :25
+   Time zone (East +) - - - -  :0
+   Longitude (w neg, decimals) :0
+   Latitude  (n pos, decimals) :67.43
+
+   Moon
+    1747
+    1206
+
+   Sun
+    1156
+    1204
+
+   Nautical twilight
+     747
+    1613
+</pre>
+
+	<p>Skymap Pro shows that the Sun remains below the horizon for the whole
+	of that day at the latitude given. SkyMap Pro gives the altitude of the
+	(centre of) Sun at transit for this day as roughly 53 minutes below the
+	horizon. This implies an error of roughly 30 minutes in Sun position at
+	that time for the <code>QBASIC</code> program. This seems rather large
+	and I will be puggling about with this a bit more.
+
+	<p>The Moon times and times for twilight are within a minute of those
+	produced by SkyMap Pro. You might treat output from the
+	<code>QBASIC</code> program presented here with caution for locations
+	with latitudes between 67 and 68 North.
+
+	<h4>Case 3</h4>
+
+	<p>For Narvik in Norway (further North), the program gives correct
+	results give or take a minute:-
+
+	<pre>
+   Rise and set for Sun and Moon
+   =============================
+
+   Year (yyyy) - - - - - - - - :2000
+   Month  (mm) - - - - - - - - :1
+   Day    (dd) - - - - - - - - :3
+   Time zone (East +) - - - -  :1
+   Longitude (w neg, decimals) :17.42
+   Latitude  (n pos, decimals) :68.43
+
+   Moon
+     629
+    1157
+
+   Sun
+    always below horizon
+
+   Nautical twilight
+     743
+    1607
+</pre>
+
+	<p>SkyMap Pro gives
+
+	<pre>
+Moon
+Rise: 6h 27m 59s
+Set: 11h 57m 47s
+
+Date           Rise        Set         Naut Twi E    Naut Twi B
+03 Jan 2000    --:--:--    --:--:--    16:07:06      07:42:21
+</pre>
+
+	<h2><a id="twig05">References</a></h2>
+	[ <a href="#twig00">Top</a> ]
+
+	<p>Oliver Montenbruck and Thomas Pfleger,
+	<br><i>Astronomy on the Personal Computer</i>
+	<br>Springer
+	<br>1994, 3rd edition
+	<br>ISBN 3-540-63521-1
+
+	<p>Section 3.8 of this book is the basis of the <code>QBASIC</code>
+	listing here. I have translated the <code>PASCAL</code> routines into
+	<code>QBASIC</code> one by one. This book does not contain an exhaustive
+	explanation of the quadratic fit method, and the test data the authors
+	provide will not test all branches of the code. This book comes with a
+	software disc with all the <code>PASCAL</code> routines - but does not
+	cover all the ground in, say, Meeus' <cite>Astronomical
+	Algorithms</cite>.
+
+	<p>Sky and Telescope's software pages contain listings in 'spaghetti
+	basic' that implement a similar method for the Sun and the Moon - there
+	is a clever fix used to avoid re-calculating positions for the Sun and
+	Moon up to 12 times each day at the cost of some increase in the 'fuzzy
+	zone' when the programs may predict a Sunrise and set when there is
+	none. The links below are to the <code>BASICA</code> listings (via
+	Wayback Machine; the original Sky &amp; Telescope pages are gone).
+
+	<p><a href="https://web.archive.org/web/20001214124500/http://www.skypub.com/resources/software/basic/programs/sunup.bas">
+	http://www.skypub.com/resources/software/basic/programs/sunup.bas</a>
+
+	<p><a href="https://web.archive.org/web/19991114002705/http://www.skypub.com/resources/software/basic/programs/moonup.bas">
+	http://www.skypub.com/resources/software/basic/programs/moonup.bas</a>
+
+	<p>Seidelmann, P. Kenneth (ed)
+	<br><i>Explanatory Supplement to the Astronomical Almanac</i>
+	<br>University Science Books
+	<br>1992, completely revised
+	<br>ISBN 0-935702-68-7
+
+	<p>Definitive reference on all aspects of the <cite>ephemeris</cite> and
+	associated calculations. No hostages taken, no example calculations and
+	modern vectoral notation used throughout. Sections 9.311 (p484) and 9.33
+	(p486) present the iterative algorithm for Sunrise for moderate
+	latitudes.
+
+	<p>
+	Duffett-Smith, Peter<br>
+	<cite>Practical Astronomy with your calculator</cite><br>
+	Cambridge University Press<br>
+	3rd edition 1988<br>
+	ISBN 0-521-35699-7
+
+	<p>Good treatment of the basics of coordinate systems. Presents the
+	formulas for rise and set time of a star, and presents an interesting
+	linear interpolation scheme for Moonrise.
+
+	<hr>
+	Last Modified 2000 Jan 3rd<br>
+	Keith Burnett<br>
+	<address>keith@xylem.demon.co.uk</address>
+
+	<script src="/static/archive.js"></script>
+</body>
+
+</html>

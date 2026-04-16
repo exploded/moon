@@ -3,12 +3,9 @@
 
 <head>
 	<meta charset="utf-8">
-	<meta http-equiv="X-UA-Compatible" content="IE=edge">
 	<meta name="description" content="A page to find the rise and set times of the moon for any location. Uses Google Maps to find your location.">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>Moon Rise and Set Times</title>
-	<script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
-	<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
 	<link rel="stylesheet" href="static/styles.css">
 </head>
 
@@ -19,7 +16,7 @@
 				<h1 class="header-title">🌙 Moon Rise and Set Times</h1>
 				<div class="spacer"></div>
 				<nav class="nav">
-					<a class="nav-link current" href="/"><i class="material-icons" style="font-size: 18px;">home</i> Home</a>
+					<a class="nav-link current" href="/"><svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Home</a>
 					<a class="nav-link" href="about">About</a>
 					<a id="callink" class="nav-link" href="calendar">Calendar</a>
 				</nav>
@@ -38,16 +35,16 @@
 							<div class="input-row">
 								<div class="input-group">
 									<label class="input-label" for="lat">Latitude</label>
-								<input id="lat" type="number" pattern="-?[0-9]*(\.[0-9]+)?" min="-90" max="90" step="any" onchange="SpinnersChanged()" value="-37" aria-label="Latitude in decimal degrees" />
+								<input id="lat" type="number" pattern="-?[0-9]*(\.[0-9]+)?" min="-90" max="90" step="any" value="-37" aria-label="Latitude in decimal degrees" />
 							</div>
 							<div class="input-group">
 								<label class="input-label" for="lon">Longitude</label>
-								<input id="lon" type="number" pattern="-?[0-9]*(\.[0-9]+)?" min="-180" max="180" step="any" onchange="SpinnersChanged()" value="144" aria-label="Longitude in decimal degrees" />
+								<input id="lon" type="number" pattern="-?[0-9]*(\.[0-9]+)?" min="-180" max="180" step="any" value="144" aria-label="Longitude in decimal degrees" />
 							</div>
 						</div>
 						<div class="input-group">
 						<label class="input-label" for="timezone">Timezone</label>
-						<select id="timezone" onchange="timezoneChanged()" aria-label="Select timezone">
+						<select id="timezone" aria-label="Select timezone">
 							<option value="">Loading timezones...</option>
 						</select>
 						<input id="zon" type="hidden" value="" />
@@ -69,18 +66,14 @@
 				<p id="errormessage" role="alert" aria-live="polite"></p>
 			</div>
 					<div class="card-actions">
-						<button class="btn" onclick="refresh()" aria-label="Reset location to browser location">
-							<i class="material-icons" style="font-size: 18px;">my_location</i> Use My Location
+						<button id="useMyLocationBtn" class="btn" aria-label="Reset location to browser location">
+							<svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/></svg> Use My Location
 						</button>
 					</div>
 				</div>
 			</div>
 		</main>
 	</div>
-	<script>
-		// Google Maps API key passed from server
-		window.GOOGLE_MAPS_KEY = '{{.GoogleMapsKey}}';
-	</script>
 	<script src="static/script.js"></script>
 	<script src="https://maps.googleapis.com/maps/api/js?key={{.GoogleMapsKey}}&loading=async&callback=initMap&libraries=marker" async defer></script>
 </body>
