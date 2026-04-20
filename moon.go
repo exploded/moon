@@ -22,10 +22,12 @@ import (
 	"encoding/json"
 	"html/template"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 
@@ -55,6 +57,76 @@ func init() {
 		panic("failed to read templates/riset.bas: " + err.Error())
 	}
 	risetBasSource = string(bas)
+}
+
+// rateLimiter tracks request counts per IP using a sliding window.
+type rateLimiter struct {
+	mu       sync.Mutex
+	visitors map[string]*visitor
+	rate     int           // max requests per window
+	window   time.Duration // window duration
+}
+
+type visitor struct {
+	count    int
+	windowStart time.Time
+}
+
+func newRateLimiter(rate int, window time.Duration) *rateLimiter {
+	rl := &rateLimiter{
+		visitors: make(map[string]*visitor),
+		rate:     rate,
+		window:   window,
+	}
+	go rl.cleanup()
+	return rl
+}
+
+// cleanup removes stale entries every minute.
+func (rl *rateLimiter) cleanup() {
+	for {
+		time.Sleep(time.Minute)
+		rl.mu.Lock()
+		for ip, v := range rl.visitors {
+			if time.Since(v.windowStart) > rl.window {
+				delete(rl.visitors, ip)
+			}
+		}
+		rl.mu.Unlock()
+	}
+}
+
+// allow returns true if the request from ip should be allowed.
+func (rl *rateLimiter) allow(ip string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	v, exists := rl.visitors[ip]
+	now := time.Now()
+
+	if !exists || now.Sub(v.windowStart) > rl.window {
+		rl.visitors[ip] = &visitor{count: 1, windowStart: now}
+		return true
+	}
+
+	v.count++
+	return v.count <= rl.rate
+}
+
+// rateLimit is HTTP middleware that returns 429 when an IP exceeds the limit.
+func rateLimit(limiter *rateLimiter, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			ip = r.RemoteAddr
+		}
+		if !limiter.allow(ip) {
+			slog.Warn("rate limit exceeded", "ip", ip)
+			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // Get Google Maps API key from environment variable
@@ -106,6 +178,9 @@ func cacheStaticAssets(next http.Handler) http.Handler {
 	})
 }
 
+// limiter allows 60 requests per minute per IP.
+var limiter = newRateLimiter(60, time.Minute)
+
 func makeServerFromMux(mux *http.ServeMux, isProd bool) *http.Server {
 	// set timeouts so that a slow or malicious client doesn't
 	// hold resources forever
@@ -113,7 +188,7 @@ func makeServerFromMux(mux *http.ServeMux, isProd bool) *http.Server {
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
-		Handler:      requestLogger(securityHeaders(isProd, mux)),
+		Handler:      requestLogger(rateLimit(limiter, securityHeaders(isProd, mux))),
 	}
 }
 
