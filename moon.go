@@ -164,7 +164,7 @@ func securityHeaders(isProd bool, next http.Handler) http.Handler {
 		//              styles on markers/controls.
 		//   font-src:   fonts.gstatic.com — font files for the above stylesheet.
 		//   img-src:    *.googleapis.com / *.gstatic.com — Maps tiles and icons.
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-eval' blob: https://maps.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' data: https://maps.googleapis.com https://*.gstatic.com; worker-src blob:")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-eval' blob: https://maps.googleapis.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' data: https://maps.googleapis.com https://*.gstatic.com https://cloudflareinsights.com; worker-src blob:")
 		next.ServeHTTP(w, r)
 	})
 }
