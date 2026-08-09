@@ -129,13 +129,17 @@ func rateLimit(limiter *rateLimiter, next http.Handler) http.Handler {
 	})
 }
 
-// Get Google Maps API key from environment variable
-func getGoogleMapsKey() string {
-	key := os.Getenv("GOOGLE_MAPS_API_KEY")
-	if key == "" {
-		slog.Warn("GOOGLE_MAPS_API_KEY not set in environment")
+// googleMapsKey is read once at startup by loadGoogleMapsKey. A missing key is a
+// deployment fault that is fixed once, so it is reported once at startup rather
+// than on every page render -- the old per-request warning turned a single
+// misconfiguration into a warning for every visitor, forever.
+var googleMapsKey string
+
+func loadGoogleMapsKey() {
+	googleMapsKey = os.Getenv("GOOGLE_MAPS_API_KEY")
+	if googleMapsKey == "" {
+		slog.Warn("GOOGLE_MAPS_API_KEY not set - the map will not render")
 	}
-	return key
 }
 
 // Add request logging
@@ -200,6 +204,7 @@ func makeHTTPServer(isProd bool) *http.Server {
 	mux.HandleFunc("/calendar", calendar)
 	mux.HandleFunc("/archive", handleArchive)
 	mux.HandleFunc("/favicon.ico", handleFavicon)
+	mux.HandleFunc("/health", handleHealth)
 	path, _ := os.Getwd()
 	slog.Info("Working directory", "path", path)
 	fileServer := http.FileServer(http.Dir(path + "/static"))
@@ -238,6 +243,8 @@ func main() {
 	} else {
 		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
 	}
+
+	loadGoogleMapsKey()
 
 	slog.Info("Production", "enabled", flgProduction)
 	slog.Info("HTTP Port", "port", httpPort)
@@ -389,7 +396,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
-	data := struct{ GoogleMapsKey string }{GoogleMapsKey: getGoogleMapsKey()}
+	data := struct{ GoogleMapsKey string }{GoogleMapsKey: googleMapsKey}
 
 	if err := templates.ExecuteTemplate(w, "index.html", data); err != nil {
 		slog.Error("Error executing index template", "error", err)
@@ -462,6 +469,15 @@ func handleArchive(w http.ResponseWriter, r *http.Request) {
 
 func handleFavicon(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "favicon.ico")
+}
+
+// handleHealth is the uptime-monitor endpoint. moon computes its rise/set times
+// from the request alone -- there is no database or upstream to check -- so a
+// process that answers at all is a healthy one.
+func handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Write([]byte("ok"))
 }
 
 func handle404(w http.ResponseWriter, r *http.Request) {
