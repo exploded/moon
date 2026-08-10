@@ -24,9 +24,11 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -59,24 +61,42 @@ func init() {
 	risetBasSource = string(bas)
 }
 
-// rateLimiter tracks request counts per IP using a sliding window.
+// rateLimiter tracks request counts per visitor using a sliding window.
 type rateLimiter struct {
 	mu       sync.Mutex
 	visitors map[string]*visitor
 	rate     int           // max requests per window
 	window   time.Duration // window duration
+
+	// Warning output is throttled separately from the limiting itself --
+	// see recordBlockLocked for why.
+	logEvery    time.Duration
+	lastReport  time.Time
+	blocked     int
+	blockedKeys map[string]struct{}
+	sampleKey   string
 }
 
 type visitor struct {
-	count    int
+	count       int
 	windowStart time.Time
 }
 
-func newRateLimiter(rate int, window time.Duration) *rateLimiter {
+// blockReport aggregates the rejections that have accumulated since the last
+// warning was emitted.
+type blockReport struct {
+	Requests int    // rejected requests covered by this report
+	Visitors int    // distinct keys among them
+	Sample   string // one of those keys, as a starting point for investigation
+}
+
+func newRateLimiter(rate int, window, logEvery time.Duration) *rateLimiter {
 	rl := &rateLimiter{
-		visitors: make(map[string]*visitor),
-		rate:     rate,
-		window:   window,
+		visitors:    make(map[string]*visitor),
+		rate:        rate,
+		window:      window,
+		logEvery:    logEvery,
+		blockedKeys: make(map[string]struct{}),
 	}
 	go rl.cleanup()
 	return rl
@@ -87,41 +107,183 @@ func (rl *rateLimiter) cleanup() {
 	for {
 		time.Sleep(time.Minute)
 		rl.mu.Lock()
-		for ip, v := range rl.visitors {
+		for key, v := range rl.visitors {
 			if time.Since(v.windowStart) > rl.window {
-				delete(rl.visitors, ip)
+				delete(rl.visitors, key)
 			}
 		}
 		rl.mu.Unlock()
 	}
 }
 
-// allow returns true if the request from ip should be allowed.
-func (rl *rateLimiter) allow(ip string) bool {
+// allow reports whether a request from key may proceed. When it may not, the
+// returned report is non-nil only if a warning is due, and carries the
+// aggregate of every rejection suppressed since the previous one.
+func (rl *rateLimiter) allow(key string) (bool, *blockReport) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	v, exists := rl.visitors[ip]
 	now := time.Now()
+	v, exists := rl.visitors[key]
 
 	if !exists || now.Sub(v.windowStart) > rl.window {
-		rl.visitors[ip] = &visitor{count: 1, windowStart: now}
-		return true
+		rl.visitors[key] = &visitor{count: 1, windowStart: now}
+		return true, nil
 	}
 
 	v.count++
-	return v.count <= rl.rate
+	if v.count <= rl.rate {
+		return true, nil
+	}
+	return false, rl.recordBlockLocked(key, now)
 }
 
-// rateLimit is HTTP middleware that returns 429 when an IP exceeds the limit.
+// recordBlockLocked folds a rejection into the pending aggregate and returns a
+// report when one is due.
+//
+// One warning per rejected request is what produced ~13k WARNs in 90 days. The
+// volume scaled with traffic, so correct keying alone would not bound it -- a
+// genuine flood would still author a line per request, and monitor's logship
+// handler is pinned at LevelWarn, so every one of them ships. Reporting on an
+// interval bounds it by construction: at most one line per logEvery however
+// hard the limiter is being hit, and the counts still convey the scale.
+//
+// The first rejection after a quiet period reports immediately, so a real
+// attack surfaces without waiting out an interval.
+func (rl *rateLimiter) recordBlockLocked(key string, now time.Time) *blockReport {
+	rl.blocked++
+	rl.blockedKeys[key] = struct{}{}
+	if rl.sampleKey == "" {
+		rl.sampleKey = key
+	}
+
+	if !rl.lastReport.IsZero() && now.Sub(rl.lastReport) < rl.logEvery {
+		return nil
+	}
+
+	rep := &blockReport{
+		Requests: rl.blocked,
+		Visitors: len(rl.blockedKeys),
+		Sample:   rl.sampleKey,
+	}
+	rl.lastReport = now
+	rl.blocked = 0
+	rl.blockedKeys = make(map[string]struct{})
+	rl.sampleKey = ""
+	return rep
+}
+
+// warnNoRealIP makes the "proxy is not sending X-Real-IP" warning fire once for
+// the life of the process rather than once per request, in the same spirit as
+// loadGoogleMapsKey: a misconfiguration that is fixed once should be reported
+// once.
+var warnNoRealIP sync.Once
+
+// clientKey derives the rate-limiter bucket for a request.
+//
+// moon runs behind Caddy on 127.0.0.1, so r.RemoteAddr is the proxy rather than
+// the visitor -- keying on it puts the entire internet in a single bucket, which
+// is what caused real users to collect 429s. The visitor address has to come
+// from a header instead, and a header is only worth keying on if the client
+// cannot set it:
+//
+//   - X-Real-IP is set by Caddy with `header_up`, which overwrites whatever the
+//     client sent. Caddy fills it from {client_ip}, which it resolves by walking
+//     X-Forwarded-For from the right and skipping addresses in its
+//     trusted_proxies list (Cloudflare's published ranges). So it is the real
+//     visitor on the Cloudflare path and the peer on a direct hit to the origin,
+//     and never a value the client chose.
+//   - Failing that, the last X-Forwarded-For hop is the address Caddy itself
+//     appended, i.e. Caddy's own view of its peer. Coarser -- every Cloudflare
+//     visitor arriving via one edge shares a bucket -- but still unforgeable, so
+//     it degrades safely rather than back to one global bucket.
+//
+// CF-Connecting-IP is deliberately not consulted. The origin answers on :443
+// directly, so a request that skips Cloudflare can carry any value it likes in
+// that header; trusting it would let an attacker mint an unlimited number of
+// buckets and bypass the limiter entirely. Caddy has already folded the "did
+// this really come from Cloudflare" question into {client_ip}.
+//
+// Both headers are consulted only when the request arrived over loopback. If
+// moon is ever exposed directly, the peer address is the only truth.
+func clientKey(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+
+	peer, err := netip.ParseAddr(host)
+	if err != nil {
+		// Unparseable peer: fall back to the raw string so distinct peers stay
+		// in distinct buckets rather than collapsing into one.
+		return host
+	}
+	if !peer.IsLoopback() {
+		return bucketFor(peer)
+	}
+
+	if ip, ok := parseIP(r.Header.Get("X-Real-IP")); ok {
+		return bucketFor(ip)
+	}
+
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		hops := strings.Split(xff, ",")
+		if ip, ok := parseIP(hops[len(hops)-1]); ok {
+			warnNoRealIP.Do(func() {
+				slog.Warn("proxy is not setting X-Real-IP - rate limiting is per proxy hop, not per visitor",
+					"fix", "add `header_up X-Real-IP {client_ip}` to the moon reverse_proxy block")
+			})
+			return bucketFor(ip)
+		}
+	}
+
+	return bucketFor(peer)
+}
+
+// parseIP parses a single address from a header value, tolerating surrounding
+// whitespace and an optional :port.
+func parseIP(s string) (netip.Addr, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return netip.Addr{}, false
+	}
+	if ip, err := netip.ParseAddr(s); err == nil {
+		return ip, true
+	}
+	if ap, err := netip.ParseAddrPort(s); err == nil {
+		return ap.Addr(), true
+	}
+	return netip.Addr{}, false
+}
+
+// bucketFor canonicalises an address into a limiter key, grouping IPv6 by /64.
+// A single IPv6 subscriber is routinely handed a whole /64 or larger, so keying
+// on the full address would let one visitor mint a fresh bucket per request
+// just by picking a new source address out of their own prefix.
+func bucketFor(ip netip.Addr) string {
+	ip = ip.Unmap().WithZone("")
+	if ip.Is6() {
+		if p, err := ip.Prefix(64); err == nil {
+			return p.String()
+		}
+	}
+	return ip.String()
+}
+
+// rateLimit is HTTP middleware that returns 429 when a visitor exceeds the limit.
 func rateLimit(limiter *rateLimiter, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			ip = r.RemoteAddr
+		allowed, report := limiter.allow(clientKey(r))
+		if report != nil {
+			slog.Warn("rate limit exceeded",
+				"requests", report.Requests,
+				"visitors", report.Visitors,
+				"sample", report.Sample,
+				"limit", limiter.rate,
+				"window", limiter.window.String(),
+			)
 		}
-		if !limiter.allow(ip) {
-			slog.Warn("rate limit exceeded", "ip", ip)
+		if !allowed {
 			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 			return
 		}
@@ -182,8 +344,9 @@ func cacheStaticAssets(next http.Handler) http.Handler {
 	})
 }
 
-// limiter allows 60 requests per minute per IP.
-var limiter = newRateLimiter(60, time.Minute)
+// limiter allows 60 requests per minute per visitor, and emits at most one
+// warning per minute no matter how many visitors are being turned away.
+var limiter = newRateLimiter(60, time.Minute, time.Minute)
 
 func makeServerFromMux(mux *http.ServeMux, isProd bool) *http.Server {
 	// set timeouts so that a slow or malicious client doesn't

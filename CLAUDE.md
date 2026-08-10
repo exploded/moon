@@ -38,7 +38,13 @@ The deploy script (`scripts/deploy-moon`) stops the service, replaces the binary
 
 Single-file Go server (`moon.go`) with no framework. All handlers, middleware, and `main()` live in one file.
 
-**Request flow:** `main()` → `makeHTTPServer()` → `http.ServeMux` with middleware chain: `requestLogger(securityHeaders(mux))`. Static assets get an additional `cacheStaticAssets` wrapper.
+**Request flow:** `main()` → `makeHTTPServer()` → `http.ServeMux` with middleware chain: `requestLogger(rateLimit(limiter, securityHeaders(isProd, mux)))`. Static assets get an additional `cacheStaticAssets` wrapper.
+
+**Rate limiter trust model (don't "simplify" this):** moon sits behind Caddy on `127.0.0.1`, so `r.RemoteAddr` is always the proxy — keying on it puts the whole internet in one 60/min bucket, which is exactly the bug fixed here. `clientKey()` keys on `X-Real-IP`, which Caddy sets via `header_up X-Real-IP {client_ip}` in the moon `reverse_proxy` block (**required** — without it the limiter falls back to the last `X-Forwarded-For` hop, which is the Cloudflare edge, and every visitor through one edge shares a bucket). Caddy resolves `{client_ip}` using the global `trusted_proxies` list of Cloudflare ranges in `/etc/caddy/Caddyfile`, which is the single place that list is maintained — do not duplicate it into Go.
+
+`CF-Connecting-IP` is deliberately never read: the origin answers on `:443` directly (not firewalled to Cloudflare), so on that path the header is attacker-controlled and trusting it would let one client mint unlimited buckets. Proxy headers are consulted only when the peer is loopback. IPv6 is bucketed by `/64` so a subscriber can't rotate through their own prefix.
+
+Warnings are throttled to one per `logEvery` with an aggregate count, not one per rejected request — monitor's logship handler is pinned at `slog.LevelWarn`, so anything logged at WARN ships, and per-request warnings previously produced ~13k lines in 90 days.
 
 **Routes:**
 - `/` — home page with Google Maps, geolocation, moon rise/set display
